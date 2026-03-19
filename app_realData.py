@@ -1,5 +1,9 @@
 """
-Keratoconus Progression Prediction — Streamlit Web Application
+Keratoconus Progression Prediction — Full Version (requires local data)
+
+This version requires X_train.pkl (patient training data) which is NOT
+included in the repository for privacy reasons. You must generate it
+locally from your own data. See app.py for the privacy-safe version.
 
 A clinical decision-support tool that loads a pre-trained logistic regression model
 for binary classification of keratoconus progression risk. Users enter 3 clinical
@@ -13,14 +17,13 @@ Features:
     - Input validation against training data boundaries
     - Real-time sparkline distribution visualization per feature
     - SHAP force plot for model interpretability
-    - Probability display for both classes
     - StandardScaler preprocessing matching the training pipeline
 
 Dependencies:
     streamlit, numpy, pandas, joblib, shap, matplotlib, sparklines
 
 Usage:
-    streamlit run app.py
+    streamlit run app_realData.py
 """
 
 import streamlit as st

@@ -1,15 +1,16 @@
-# Keratoconus Progression Predictor
+# Keratoconus 1-Year Progression Predictor
 
-A clinical decision-support web application for predicting keratoconus progression risk using a pre-trained logistic regression model with SHAP explainability.
+Interactive demonstration of the machine learning model described in:
+
+> Gil P, Gil JQ, Mendes L, Alves N, Rosa A, Murta J. *"Predicting Keratoconus Progression Within 1–2 Years Using Baseline Tomography and an Explainable Open-Access Machine Learning Model."*
 
 ## Features
 
 - **3 clinical feature inputs** (BAD-D, Age, ARC 3mm) with real-time validation against training data boundaries
-- **Binary classification** — predicts one-year progression risk (Class 0: No Progression, Class 1: Progression)
-- **SHAP force plot** — shows how each feature pushes the prediction
+- **Binary classification** — predicts one-year progression risk (Progression / Stability)
 - **SHAP waterfall plot** — bar-chart breakdown of individual feature contributions
-- **Probability display** — confidence scores for both classes
-- **Privacy-safe** — no patient data required at runtime; SHAP uses a synthetic background
+- **SHAP decision plot** — cumulative path from base value to final prediction
+- **Privacy-safe** — no patient data required at runtime; SHAP uses a synthetic background derived from the StandardScaler
 
 ## Live Demo
 
@@ -34,7 +35,7 @@ streamlit run app.py
 
 ```
 ├── app.py                 # Streamlit application (privacy-safe, no patient data)
-├── app_realData.py        # Full version with sparkline distributions (requires X_train.pkl)
+├── app_realData.py        # Reference version (requires local X_train.pkl, not included)
 ├── requirements.txt       # Python dependencies
 ├── logistic_model.pkl     # Trained logistic regression model
 ├── scaler.pkl             # StandardScaler fitted on training data
@@ -53,7 +54,7 @@ streamlit run app.py
 
 ## Disclaimer
 
-This tool is intended for research and educational purposes only. It is not a certified medical device and should not be used as the sole basis for clinical decisions.
+**Not for clinical use.** This application is a research demonstration intended solely to illustrate the algorithm described in the accompanying publication. It is not a certified or validated medical device and must not be used for clinical decision-making.
 
 ## License
 

@@ -11,9 +11,8 @@ Users enter 3 baseline Pentacam features (BAD-D, Age, ARC 3mm) and receive
 a 1-year progression risk prediction with SHAP explanations showing how
 each feature drives the individual prediction.
 
-This version does NOT require patient training data (X_train.pkl). SHAP
-explanations use a synthetic background derived from the fitted StandardScaler,
-making it safe to deploy on public repositories without exposing patient data.
+SHAP explanations use a synthetic background derived from the fitted
+StandardScaler, requiring no patient data at runtime.
 
 The model was trained on real keratoconus data (412 patients, one-year prediction
 window) with SMOTE balancing and StandardScaler preprocessing.
