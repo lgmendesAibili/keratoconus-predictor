@@ -21,7 +21,7 @@ window) with SMOTE balancing and StandardScaler preprocessing.
 Features:
     - Input validation against training data boundaries
     - SHAP waterfall plot and decision plot for interpretability
-    - Probability display for both classes
+    - Binary classification result display
     - StandardScaler preprocessing matching the training pipeline
     - No patient data required at runtime
 
@@ -130,49 +130,9 @@ st.markdown('''
         margin: 0 0 0.3rem 0;
         font-size: 1.5rem;
     }
-    .result-card .confidence {
-        font-size: 2.2rem;
-        font-weight: 700;
-        margin: 0.5rem 0;
-    }
     .result-card .label {
         font-size: 0.9rem;
         opacity: 0.9;
-    }
-
-    /* Probability bar */
-    .prob-container {
-        background: #f8f9fa;
-        border-radius: 0.75rem;
-        padding: 1.2rem;
-        border: 1px solid #d5dbdb;
-    }
-    .prob-bar-track {
-        background: #e8e8e8;
-        border-radius: 1rem;
-        height: 2rem;
-        position: relative;
-        overflow: hidden;
-        margin: 0.5rem 0;
-    }
-    .prob-bar-fill-stable {
-        background: linear-gradient(90deg, #27ae60, #2ecc71);
-        height: 100%;
-        border-radius: 1rem 0 0 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: 600;
-        font-size: 0.85rem;
-        min-width: 3rem;
-    }
-    .prob-labels {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.8rem;
-        color: #7f8c8d;
-        margin-top: 0.25rem;
     }
 
     /* Feature reference table */
@@ -408,8 +368,7 @@ def main():
        min/max range of +/-1 SD to allow exploratory inputs.
     3. Shows a live validation summary.
     4. On button click, runs inference and displays:
-       - Predicted class with confidence percentage.
-       - Class probability metrics.
+       - Predicted class (progression / stability).
        - SHAP waterfall and decision plots for interpretability.
     5. Populates the sidebar with model metadata, feature boundaries, and citation.
     """
@@ -487,9 +446,6 @@ def main():
 
             try:
                 prediction = model.predict(input_array)[0]
-                probability = model.predict_proba(input_array)[0]
-                prob_stable = probability[0]
-                prob_progression = probability[1]
 
                 # --- Result Display ---
                 st.markdown("")
@@ -497,39 +453,19 @@ def main():
 
                 with res_col2:
                     if prediction == 1:
-                        st.markdown(f'''
+                        st.markdown('''
                         <div class="result-card result-progression">
                             <h2>PROGRESSION RISK DETECTED</h2>
-                            <div class="confidence">{prob_progression:.1%}</div>
-                            <div class="label">Estimated probability of progression within 1 year</div>
+                            <div class="label">The model predicts keratoconus progression within 1 year</div>
                         </div>
                         ''', unsafe_allow_html=True)
                     else:
-                        st.markdown(f'''
+                        st.markdown('''
                         <div class="result-card result-stable">
                             <h2>LOW PROGRESSION RISK</h2>
-                            <div class="confidence">{prob_stable:.1%}</div>
-                            <div class="label">Estimated probability of stability within 1 year</div>
+                            <div class="label">The model predicts stability within 1 year</div>
                         </div>
                         ''', unsafe_allow_html=True)
-
-                # --- Probability Breakdown ---
-                st.markdown("")
-                prob_col1, prob_col2, prob_col3 = st.columns([1, 3, 1])
-                with prob_col2:
-                    st.markdown(f'''
-                    <div class="prob-container">
-                        <div class="prob-bar-track">
-                            <div class="prob-bar-fill-stable" style="width: {prob_stable*100:.1f}%">
-                                Stable {prob_stable:.1%}
-                            </div>
-                        </div>
-                        <div class="prob-labels">
-                            <span>Stable (No Progression)</span>
-                            <span>Progression — {prob_progression:.1%}</span>
-                        </div>
-                    </div>
-                    ''', unsafe_allow_html=True)
 
                 # --- SHAP Explainability ---
                 st.markdown("")
