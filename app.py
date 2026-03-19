@@ -358,6 +358,11 @@ def display_shap_plots(model, scaler, input_data, feature_names):
     </div>
     ''', unsafe_allow_html=True)
 
+    # High DPI for crisp rendering on retina/HiDPI displays
+    plot_dpi = 200
+    plt.rcParams['figure.dpi'] = plot_dpi
+    plt.rcParams['savefig.dpi'] = plot_dpi
+
     col_force, col_waterfall, col_decision = st.columns(3)
 
     with col_force:
@@ -372,9 +377,10 @@ def display_shap_plots(model, scaler, input_data, feature_names):
             show=False
         )
         fig_fp = plt.gcf()
+        fig_fp.set_dpi(plot_dpi)
         fig_fp.set_size_inches(10, 3)
         plt.tight_layout()
-        st.pyplot(fig_fp, bbox_inches='tight')
+        st.pyplot(fig_fp, bbox_inches='tight', dpi=plot_dpi)
         plt.close(fig_fp)
 
     with col_waterfall:
@@ -385,21 +391,21 @@ def display_shap_plots(model, scaler, input_data, feature_names):
             data=input_data[0],
             feature_names=feature_names
         )
-        fig_wf, ax_wf = plt.subplots(figsize=(10, 4))
+        fig_wf, ax_wf = plt.subplots(figsize=(10, 4), dpi=plot_dpi)
         shap.plots.waterfall(explanation, show=False)
-        st.pyplot(fig_wf, bbox_inches='tight')
+        st.pyplot(fig_wf, bbox_inches='tight', dpi=plot_dpi)
         plt.close(fig_wf)
 
     with col_decision:
         st.markdown('<p class="section-label">Decision Plot</p>', unsafe_allow_html=True)
-        fig_dp, ax_dp = plt.subplots(figsize=(10, 4))
+        fig_dp, ax_dp = plt.subplots(figsize=(10, 4), dpi=plot_dpi)
         shap.decision_plot(
             explainer.expected_value,
             shap_values,
             feature_names=feature_names,
             show=False
         )
-        st.pyplot(fig_dp, bbox_inches='tight')
+        st.pyplot(fig_dp, bbox_inches='tight', dpi=plot_dpi)
         plt.close(fig_dp)
 
 
