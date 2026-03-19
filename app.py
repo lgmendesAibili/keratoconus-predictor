@@ -2,15 +2,19 @@
 Keratoconus Progression Prediction — Streamlit Web Application
 
 A clinical decision-support tool that loads a pre-trained logistic regression model
-for binary classification of keratoconus progression risk. Users enter 5 numerical
-clinical features and receive real-time predictions with SHAP force plot
-explanations showing individual feature contributions.
+for binary classification of keratoconus progression risk. Users enter 3 clinical
+features (BAD-D, Age, ARC 3mm) and receive real-time predictions with SHAP force
+plot explanations showing individual feature contributions.
+
+The model was trained on real keratoconus data (412 patients, one-year prediction
+window) with SMOTE balancing and StandardScaler preprocessing.
 
 Features:
     - Input validation against training data boundaries
     - Real-time sparkline distribution visualization per feature
     - SHAP force plot for model interpretability
     - Probability display for both classes
+    - StandardScaler preprocessing matching the training pipeline
 
 Dependencies:
     streamlit, numpy, pandas, joblib, shap, matplotlib, sparklines
@@ -33,7 +37,7 @@ from pathlib import Path
 APP_DIR = Path(__file__).parent
 
 # Page configuration
-st.set_page_config(page_title="Binary Classification Predictor", layout="wide")
+st.set_page_config(page_title="Keratoconus Progression Predictor", layout="wide")
 
 # Custom CSS for better styling
 st.markdown('''
@@ -53,14 +57,15 @@ st.markdown('''
 
 @st.cache_resource
 def load_model_and_data():
-    """Load the trained model, feature boundaries, and training data from disk.
+    """Load the trained model, scaler, feature boundaries, and training data.
 
     Returns:
-        tuple: A 3-tuple of (model, boundaries, X_train) where:
+        tuple: A 4-tuple of (model, scaler, boundaries, X_train) where:
             - model: sklearn LogisticRegression fitted classifier.
+            - scaler: sklearn StandardScaler fitted on training data.
             - boundaries: dict mapping feature names to dicts with keys
               'min', 'max', 'mean', 'std'.
-            - X_train: numpy.ndarray of shape (n_samples, 5) used for
+            - X_train: pandas DataFrame of shape (n_samples, 3) used for
               SHAP explainer initialization and sparkline distributions.
 
     Raises:
@@ -68,9 +73,10 @@ def load_model_and_data():
     """
     try:
         model = joblib.load(APP_DIR / 'logistic_model.pkl')
+        scaler = joblib.load(APP_DIR / 'scaler.pkl')
         boundaries = joblib.load(APP_DIR / 'boundaries.pkl')
         X_train = joblib.load(APP_DIR / 'X_train.pkl')
-        return model, boundaries, X_train
+        return model, scaler, boundaries, X_train
     except FileNotFoundError as e:
         st.error(f"Error loading files: {e}")
         st.stop()
@@ -196,11 +202,11 @@ def main():
        - SHAP force and waterfall plots for interpretability.
     5. Populates the sidebar with model metadata and feature boundary tables.
     """
-    st.title("🔮 Binary Classification Predictor")
-    st.markdown("### Logistic Regression Model with 5 Numerical Inputs")
+    st.title("🔮 Keratoconus Progression Predictor")
+    st.markdown("### Logistic Regression Model with 3 Clinical Features")
 
     # Load model and data
-    model, boundaries, X_train = load_model_and_data()
+    model, scaler, boundaries, X_train = load_model_and_data()
     feature_names = list(boundaries.keys())
 
     # Create input form
@@ -243,8 +249,11 @@ def main():
 
             with col_spark:
                 # Get training data for this feature
-                feature_idx = feature_names.index(feature)
-                feature_data = X_train[:, feature_idx]
+                if isinstance(X_train, pd.DataFrame):
+                    feature_data = X_train[feature].values
+                else:
+                    feature_idx = feature_names.index(feature)
+                    feature_data = X_train[:, feature_idx]
                 sparkline = create_sparkline(feature_data)
                 st.markdown(f"<div class='feature-stats'><small>Distribution:</small><br>{sparkline}</div>",
                            unsafe_allow_html=True)
@@ -268,8 +277,9 @@ def main():
                 st.error(error)
             st.warning("Please adjust your inputs to be within the training data range.")
         else:
-            # Create input array
-            input_array = np.array([[inputs[f] for f in feature_names]])
+            # Create input array and scale it
+            input_raw = np.array([[inputs[f] for f in feature_names]])
+            input_array = scaler.transform(input_raw)
 
             # Make prediction
             try:

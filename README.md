@@ -4,8 +4,8 @@ A clinical decision-support web application for predicting keratoconus progressi
 
 ## Features
 
-- **5 clinical feature inputs** with real-time validation against training data boundaries
-- **Binary classification** — predicts progression risk (Class 0: No Progression, Class 1: Progression)
+- **3 clinical feature inputs** (BAD-D, Age, ARC 3mm) with real-time validation against training data boundaries
+- **Binary classification** — predicts one-year progression risk (Class 0: No Progression, Class 1: Progression)
 - **SHAP force plot** — shows how each feature pushes the prediction
 - **SHAP waterfall plot** — bar-chart breakdown of individual feature contributions
 - **Sparkline distributions** — inline visualization of training data distribution per feature
@@ -25,8 +25,10 @@ streamlit run app.py
 ## Model
 
 - **Algorithm**: Logistic Regression (scikit-learn)
-- **Training**: Repeated Stratified Group K-Fold cross-validation with SMOTENC balancing
-- **Features**: 5 numerical clinical features derived from Pentacam measurements
+- **Training**: SMOTE-balanced (k=5, ratio=1.0) with StandardScaler preprocessing
+- **Data**: 412 patients (85 progressors, 327 non-progressors), one-year prediction window
+- **Features**: 3 clinical features — BAD-D, Age at Baseline, ARC (3mm Zone)
+- **Coefficients**: BAD-D=+0.3225, Age=-0.7027, ARC 3mm=-0.7370
 
 ## Project Structure
 
@@ -34,8 +36,9 @@ streamlit run app.py
 ├── app.py                 # Streamlit application
 ├── requirements.txt       # Python dependencies
 ├── logistic_model.pkl     # Trained logistic regression model
+├── scaler.pkl             # StandardScaler fitted on training data
 ├── boundaries.pkl         # Feature validation boundaries (min/max/mean/std)
-├── X_train.pkl            # Training data (used for SHAP explainer)
+├── X_train.pkl            # Scaled training data (used for SHAP explainer)
 └── .streamlit/
     └── config.toml        # Streamlit theme and server configuration
 ```
