@@ -391,7 +391,7 @@ def display_shap_plots(model, scaler, input_data, feature_names):
 
 # Human-readable feature descriptions for clinicians
 FEATURE_LABELS = {
-    "BAD-D": "BAD-D (Belin/Ambrosio Enhanced Ectasia Display)",
+    "BAD-D": "BAD-D",
     "Age": "Age at Baseline (years)",
     "ARC 3mm": "ARC 3mm Zone (Anterior Radius of Curvature)",
 }
