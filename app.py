@@ -393,9 +393,9 @@ def display_shap_plots(model, scaler, input_data, feature_names):
 
 # Human-readable feature descriptions for clinicians
 FEATURE_LABELS = {
-    "BAD-D": "BAD-D",
-    "Age at Baseline": "Age at Baseline (years)",
-    "ARC 3mm Zone": "ARC 3mm Zone (Anterior Radius of Curvature)",
+    "BAD-D": "BAD-D (Belin/Ambrosio Enhanced Ectasia Display)",
+    "Age": "Age at Baseline (years)",
+    "ARC 3mm": "ARC 3mm Zone (Anterior Radius of Curvature)",
 }
 
 
@@ -451,10 +451,12 @@ def main():
 
         with input_cols[i]:
             st.markdown(f'<div class="input-card"><h3>{label}</h3></div>', unsafe_allow_html=True)
+            # Allow input within ±1 SD beyond training min/max, clamped to 0
+            margin = bounds['std']
             value = st.number_input(
                 f"{feature}",
-                min_value=float(bounds['min'] - abs(bounds['min']) * 0.5),
-                max_value=float(bounds['max'] + abs(bounds['max']) * 0.5),
+                min_value=float(max(0, bounds['min'] - margin)),
+                max_value=float(bounds['max'] + margin),
                 value=float(bounds['mean']),
                 step=float(bounds['std'] / 10),
                 key=feature,
