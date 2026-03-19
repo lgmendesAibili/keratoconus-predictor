@@ -8,8 +8,8 @@ A clinical decision-support web application for predicting keratoconus progressi
 - **Binary classification** — predicts one-year progression risk (Class 0: No Progression, Class 1: Progression)
 - **SHAP force plot** — shows how each feature pushes the prediction
 - **SHAP waterfall plot** — bar-chart breakdown of individual feature contributions
-- **Sparkline distributions** — inline visualization of training data distribution per feature
 - **Probability display** — confidence scores for both classes
+- **Privacy-safe** — no patient data required at runtime; SHAP uses a synthetic background
 
 ## Live Demo
 
@@ -33,12 +33,12 @@ streamlit run app.py
 ## Project Structure
 
 ```
-├── app.py                 # Streamlit application
+├── app.py                 # Streamlit application (privacy-safe, no patient data)
+├── app_realData.py        # Full version with sparkline distributions (requires X_train.pkl)
 ├── requirements.txt       # Python dependencies
 ├── logistic_model.pkl     # Trained logistic regression model
 ├── scaler.pkl             # StandardScaler fitted on training data
 ├── boundaries.pkl         # Feature validation boundaries (min/max/mean/std)
-├── X_train.pkl            # Scaled training data (used for SHAP explainer)
 └── .streamlit/
     └── config.toml        # Streamlit theme and server configuration
 ```
@@ -46,11 +46,10 @@ streamlit run app.py
 ## Dependencies
 
 - streamlit
-- numpy, pandas
+- numpy
 - scikit-learn, joblib
 - shap
 - matplotlib
-- sparklines
 
 ## Disclaimer
 

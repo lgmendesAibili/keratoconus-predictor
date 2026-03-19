@@ -1,37 +1,36 @@
 """
-Keratoconus Progression Prediction — Streamlit Web Application (Privacy-Safe)
+Keratoconus Progression Prediction — Streamlit Web Application
 
 A clinical decision-support tool that loads a pre-trained logistic regression model
 for binary classification of keratoconus progression risk. Users enter 3 clinical
 features (BAD-D, Age, ARC 3mm) and receive real-time predictions with SHAP force
 plot explanations showing individual feature contributions.
 
-This version does NOT require patient training data (X_train.pkl). SHAP explanations
-use a synthetic background derived from the fitted StandardScaler, making it safe
-to deploy on public repositories without exposing patient data.
-
 The model was trained on real keratoconus data (412 patients, one-year prediction
 window) with SMOTE balancing and StandardScaler preprocessing.
 
 Features:
     - Input validation against training data boundaries
+    - Real-time sparkline distribution visualization per feature
     - SHAP force plot for model interpretability
     - Probability display for both classes
     - StandardScaler preprocessing matching the training pipeline
-    - No patient data required at runtime
 
 Dependencies:
-    streamlit, numpy, pandas, joblib, shap, matplotlib
+    streamlit, numpy, pandas, joblib, shap, matplotlib, sparklines
 
 Usage:
-    streamlit run app_lite.py
+    streamlit run app.py
 """
 
 import streamlit as st
 import numpy as np
+import pandas as pd
 import joblib
 import shap
 import matplotlib.pyplot as plt
+from sparklines import sparklines
+import streamlit.components.v1 as components
 from pathlib import Path
 
 # Resolve paths relative to this file
@@ -58,14 +57,16 @@ st.markdown('''
 
 @st.cache_resource
 def load_model_and_data():
-    """Load the trained model, scaler, and feature boundaries.
+    """Load the trained model, scaler, feature boundaries, and training data.
 
     Returns:
-        tuple: A 3-tuple of (model, scaler, boundaries) where:
+        tuple: A 4-tuple of (model, scaler, boundaries, X_train) where:
             - model: sklearn LogisticRegression fitted classifier.
             - scaler: sklearn StandardScaler fitted on training data.
             - boundaries: dict mapping feature names to dicts with keys
               'min', 'max', 'mean', 'std'.
+            - X_train: pandas DataFrame of shape (n_samples, 3) used for
+              SHAP explainer initialization and sparkline distributions.
 
     Raises:
         SystemExit: Stops the Streamlit app if pickle files are missing.
@@ -74,10 +75,32 @@ def load_model_and_data():
         model = joblib.load(APP_DIR / 'logistic_model.pkl')
         scaler = joblib.load(APP_DIR / 'scaler.pkl')
         boundaries = joblib.load(APP_DIR / 'boundaries.pkl')
-        return model, scaler, boundaries
+        X_train = joblib.load(APP_DIR / 'X_train.pkl')
+        return model, scaler, boundaries, X_train
     except FileNotFoundError as e:
         st.error(f"Error loading files: {e}")
         st.stop()
+
+def create_sparkline(data):
+    """Create a Unicode sparkline showing the distribution of a feature.
+
+    Bins the data into a 20-bin histogram, normalizes to 0-8 range, and
+    converts to Unicode block characters via the ``sparklines`` library.
+
+    Args:
+        data: 1-D array-like of numeric values (typically one column of X_train).
+
+    Returns:
+        str: Unicode sparkline string, or a default block-character string on error.
+    """
+    try:
+        hist, _ = np.histogram(data, bins=20)
+        # Normalize histogram for better visualization
+        hist_normalized = (hist / hist.max() * 8).astype(int)
+        spark_chars = ''.join(sparklines(hist_normalized))
+        return spark_chars
+    except Exception:
+        return "▁▂▃▄▅▆▇█"  # Default sparkline on error
 
 def validate_input(value, feature_name, boundaries):
     """Check whether a feature value falls within training data boundaries.
@@ -98,25 +121,22 @@ def validate_input(value, feature_name, boundaries):
     return True, ""
 
 @st.cache_resource
-def get_shap_explainer(_model, _scaler):
-    """Create and cache a SHAP LinearExplainer using a synthetic background.
+def get_shap_explainer(_model, _X_train):
+    """Create and cache a SHAP LinearExplainer for the logistic regression model.
 
-    Constructs a background dataset from the scaler's learned mean (which maps
-    to zero in scaled space). This avoids the need for actual patient training
-    data while producing identical SHAP base values.
+    Uses ``@st.cache_resource`` so the explainer is built only once per session.
+    Leading underscores on parameters tell Streamlit not to hash them.
 
     Args:
         _model: Fitted sklearn LogisticRegression estimator.
-        _scaler: Fitted sklearn StandardScaler (provides mean and scale).
+        _X_train: numpy.ndarray of training data used as background distribution.
 
     Returns:
         shap.LinearExplainer: Explainer instance ready to compute SHAP values.
     """
-    # In scaled space, the training mean is the zero vector
-    background = np.zeros((1, len(_scaler.mean_)))
-    return shap.LinearExplainer(_model, background)
+    return shap.LinearExplainer(_model, _X_train)
 
-def display_shap_force_plot(model, scaler, input_data, feature_names):
+def display_shap_force_plot(model, X_train, input_data, feature_names):
     """Render SHAP force plot and waterfall plot for a single prediction.
 
     Generates two matplotlib-based visualizations (chosen for Streamlit Cloud
@@ -132,11 +152,11 @@ def display_shap_force_plot(model, scaler, input_data, feature_names):
 
     Args:
         model: Fitted sklearn LogisticRegression estimator.
-        scaler: Fitted sklearn StandardScaler.
-        input_data: numpy.ndarray of shape (1, n_features) with scaled user inputs.
+        X_train: numpy.ndarray of training data for the SHAP background.
+        input_data: numpy.ndarray of shape (1, n_features) with user inputs.
         feature_names: list[str] of feature names matching input_data columns.
     """
-    explainer = get_shap_explainer(model, scaler)
+    explainer = get_shap_explainer(model, X_train)
     shap_values = explainer.shap_values(input_data)
 
     # Use matplotlib-based force plot (reliable on Streamlit Cloud)
@@ -174,8 +194,8 @@ def main():
     1. Loads model artifacts via ``load_model_and_data()``.
     2. Renders input fields (one per clinical feature) with defaults set to
        training-data means, step sizes of ``std / 10``, and an extended
-       min/max range of +/-50 % to allow exploratory inputs.
-    3. Shows a live validation summary.
+       min/max range of ±50 % to allow exploratory inputs.
+    3. Shows inline sparkline distributions and a live validation summary.
     4. On button click, runs inference and displays:
        - Predicted class with confidence percentage.
        - Class probability metrics.
@@ -186,7 +206,7 @@ def main():
     st.markdown("### Logistic Regression Model with 3 Clinical Features")
 
     # Load model and data
-    model, scaler, boundaries = load_model_and_data()
+    model, scaler, boundaries, X_train = load_model_and_data()
     feature_names = list(boundaries.keys())
 
     # Create input form
@@ -206,22 +226,37 @@ def main():
         for feature in feature_names:
             bounds = boundaries[feature]
 
-            # Input with default value at mean
-            value = st.number_input(
-                f"{feature}",
-                min_value=float(bounds['min'] - abs(bounds['min']) * 0.5),
-                max_value=float(bounds['max'] + abs(bounds['max']) * 0.5),
-                value=float(bounds['mean']),
-                step=float(bounds['std'] / 10),
-                key=feature,
-                help=f"Valid range: [{bounds['min']:.3f}, {bounds['max']:.3f}]"
-            )
-            inputs[feature] = value
+            # Create input with appropriate range
+            col_input, col_spark = st.columns([3, 1])
 
-            # Validate input
-            is_valid, error_msg = validate_input(value, feature, boundaries)
-            if not is_valid:
-                validation_errors.append(error_msg)
+            with col_input:
+                # Input with default value at mean
+                value = st.number_input(
+                    f"{feature}",
+                    min_value=float(bounds['min'] - abs(bounds['min']) * 0.5),
+                    max_value=float(bounds['max'] + abs(bounds['max']) * 0.5),
+                    value=float(bounds['mean']),
+                    step=float(bounds['std'] / 10),
+                    key=feature,
+                    help=f"Valid range: [{bounds['min']:.3f}, {bounds['max']:.3f}]"
+                )
+                inputs[feature] = value
+
+                # Validate input
+                is_valid, error_msg = validate_input(value, feature, boundaries)
+                if not is_valid:
+                    validation_errors.append(error_msg)
+
+            with col_spark:
+                # Get training data for this feature
+                if isinstance(X_train, pd.DataFrame):
+                    feature_data = X_train[feature].values
+                else:
+                    feature_idx = feature_names.index(feature)
+                    feature_data = X_train[:, feature_idx]
+                sparkline = create_sparkline(feature_data)
+                st.markdown(f"<div class='feature-stats'><small>Distribution:</small><br>{sparkline}</div>",
+                           unsafe_allow_html=True)
 
     with col2:
         st.markdown("#### Current Input Values:")
@@ -281,7 +316,7 @@ def main():
                 st.markdown("---")
                 st.subheader("🔍 Feature Importance (SHAP Analysis)")
                 st.markdown("This plot shows how each feature contributes to the prediction:")
-                display_shap_force_plot(model, scaler, input_array, feature_names)
+                display_shap_force_plot(model, X_train, input_array, feature_names)
 
             except Exception as e:
                 st.error(f"Prediction error: {str(e)}")
@@ -290,7 +325,7 @@ def main():
     # Display model info in sidebar
     with st.sidebar:
         st.markdown("### 📋 Model Information")
-        st.info(f"**Model Type:** Logistic Regression\n**Features:** {len(feature_names)}\n**Training Samples:** 412")
+        st.info(f"**Model Type:** Logistic Regression\n**Features:** {len(feature_names)}\n**Training Samples:** {len(X_train)}")
 
         st.markdown("### 📊 Feature Boundaries")
         for feature, bounds in boundaries.items():
