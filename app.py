@@ -90,42 +90,35 @@ def get_shap_explainer(_model, _X_train):
 
 def display_shap_force_plot(model, X_train, input_data, feature_names):
     '''Display SHAP force plot for the input'''
-    try:
-        explainer = get_shap_explainer(model, X_train)
-        shap_values = explainer.shap_values(input_data)
+    explainer = get_shap_explainer(model, X_train)
+    shap_values = explainer.shap_values(input_data)
 
-        # Generate force plot (matplotlib=False returns an HTML object)
-        force_plot = shap.force_plot(
-            explainer.expected_value,
-            shap_values,
-            input_data,
-            feature_names=feature_names,
-            matplotlib=False
-        )
+    # Use matplotlib-based force plot (reliable on Streamlit Cloud)
+    fig = plt.figure(figsize=(12, 3))
+    shap.force_plot(
+        explainer.expected_value,
+        shap_values,
+        input_data,
+        feature_names=feature_names,
+        matplotlib=True,
+        show=False
+    )
+    plt.tight_layout()
+    st.pyplot(fig, bbox_inches='tight')
+    plt.close(fig)
 
-        # Embed SHAP JS + force plot HTML directly (no initjs() needed)
-        shap_html = f"<head>{shap.getjs()}</head><body>{force_plot.html()}</body>"
-        components.html(shap_html, height=150)
-
-    except Exception as e:
-        st.warning(f"Could not generate interactive SHAP plot: {str(e)}")
-        # Fallback: show matplotlib version
-        try:
-            explainer = get_shap_explainer(model, X_train)
-            shap_values = explainer.shap_values(input_data)
-            fig, ax = plt.subplots()
-            shap.force_plot(
-                explainer.expected_value,
-                shap_values,
-                input_data,
-                feature_names=feature_names,
-                matplotlib=True,
-                show=False
-            )
-            st.pyplot(fig, bbox_inches='tight')
-            plt.close(fig)
-        except Exception as e2:
-            st.error(f"SHAP visualization failed: {str(e2)}")
+    # Also show a waterfall plot for clearer feature breakdown
+    st.markdown("#### Feature Contribution Breakdown")
+    explanation = shap.Explanation(
+        values=shap_values[0],
+        base_values=explainer.expected_value,
+        data=input_data[0],
+        feature_names=feature_names
+    )
+    fig_wf, ax_wf = plt.subplots(figsize=(10, 4))
+    shap.plots.waterfall(explanation, show=False)
+    st.pyplot(fig_wf, bbox_inches='tight')
+    plt.close(fig_wf)
 
 def main():
     """Main Streamlit application entry point.
