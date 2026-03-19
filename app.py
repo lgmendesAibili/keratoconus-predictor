@@ -1,21 +1,26 @@
 """
 Keratoconus Progression Prediction — Streamlit Web Application (Privacy-Safe)
 
-A clinical decision-support tool that loads a pre-trained logistic regression model
-for binary classification of keratoconus progression risk. Users enter 3 clinical
-features (BAD-D, Age, ARC 3mm) and receive real-time predictions with SHAP force
-plot explanations showing individual feature contributions.
+Interactive demonstration of the machine learning model described in:
 
-This version does NOT require patient training data (X_train.pkl). SHAP explanations
-use a synthetic background derived from the fitted StandardScaler, making it safe
-to deploy on public repositories without exposing patient data.
+    Gil P, Gil JQ, Mendes L, Alves N, Rosa A, Murta J.
+    "Predicting Keratoconus Progression Within 1-2 Years Using Baseline
+    Tomography and an Explainable Open-Access Machine Learning Model"
+
+Users enter 3 baseline Pentacam features (BAD-D, Age, ARC 3mm) and receive
+a 1-year progression risk prediction with SHAP explanations showing how
+each feature drives the individual prediction.
+
+This version does NOT require patient training data (X_train.pkl). SHAP
+explanations use a synthetic background derived from the fitted StandardScaler,
+making it safe to deploy on public repositories without exposing patient data.
 
 The model was trained on real keratoconus data (412 patients, one-year prediction
 window) with SMOTE balancing and StandardScaler preprocessing.
 
 Features:
     - Input validation against training data boundaries
-    - SHAP force plot for model interpretability
+    - SHAP force plot, waterfall plot, and decision plot for interpretability
     - Probability display for both classes
     - StandardScaler preprocessing matching the training pipeline
     - No patient data required at runtime
@@ -48,7 +53,7 @@ st.set_page_config(
 # Clinical-grade CSS
 st.markdown('''
 <style>
-    /* Hide Streamlit branding for cleaner clinical look */
+    /* Hide Streamlit branding for cleaner look */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
@@ -58,7 +63,7 @@ st.markdown('''
         color: white;
         padding: 1.5rem 2rem;
         border-radius: 0.75rem;
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.5rem;
         text-align: center;
     }
     .clinical-header h1 {
@@ -71,6 +76,21 @@ st.markdown('''
         margin: 0.4rem 0 0 0;
         font-size: 0.95rem;
         opacity: 0.9;
+    }
+
+    /* Research notice */
+    .research-notice {
+        background: #eaf2f8;
+        border: 1px solid #aed6f1;
+        border-radius: 0.5rem;
+        padding: 0.8rem 1.2rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.85rem;
+        color: #1a5276;
+        text-align: center;
+    }
+    .research-notice b {
+        color: #c0392b;
     }
 
     /* Input card */
@@ -206,7 +226,30 @@ st.markdown('''
         border-radius: 0 0.5rem 0.5rem 0;
         font-size: 0.8rem;
         color: #7d6608;
-        margin-top: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    /* Citation box */
+    .citation-box {
+        background: #f4f6f9;
+        border: 1px solid #d5dbdb;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.78rem;
+        color: #2c3e50;
+        margin-top: 1rem;
+        line-height: 1.5;
+    }
+
+    /* SHAP explanation text */
+    .shap-guide {
+        background: #f0f4f8;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.82rem;
+        color: #34495e;
+        margin-bottom: 1rem;
+        border-left: 3px solid #2980b9;
     }
 
     /* Sidebar styling */
@@ -280,15 +323,17 @@ def get_shap_explainer(_model, _scaler):
 
 
 def display_shap_plots(model, scaler, input_data, feature_names):
-    """Render SHAP force plot and waterfall plot for a single prediction.
+    """Render SHAP force plot, waterfall plot, and decision plot for a prediction.
 
-    Generates two matplotlib-based visualizations (chosen for Streamlit Cloud
+    Generates three matplotlib-based visualizations (chosen for Streamlit Cloud
     compatibility over JavaScript-based alternatives):
 
     1. **Force plot** — horizontal bar showing how each feature pushes the
        prediction from the base value toward the final output.
     2. **Waterfall plot** — vertical breakdown of individual feature
        contributions ordered by magnitude.
+    3. **Decision plot** — cumulative path from the base value to the final
+       prediction, showing how each feature shifts the output sequentially.
 
     All matplotlib figures are explicitly closed after rendering to prevent
     memory leaks in long-running Streamlit sessions.
@@ -302,10 +347,21 @@ def display_shap_plots(model, scaler, input_data, feature_names):
     explainer = get_shap_explainer(model, scaler)
     shap_values = explainer.shap_values(input_data)
 
-    col_force, col_waterfall = st.columns(2)
+    st.markdown('''
+    <div class="shap-guide">
+        <b>How to read these plots:</b> Each feature either pushes the prediction
+        toward <b style="color:#c0392b">progression</b> (positive SHAP value) or
+        toward <b style="color:#27ae60">stability</b> (negative SHAP value).
+        The magnitude indicates how strongly that feature influences this
+        individual prediction. The base value represents the average model output
+        across the training population.
+    </div>
+    ''', unsafe_allow_html=True)
+
+    col_force, col_waterfall, col_decision = st.columns(3)
 
     with col_force:
-        st.markdown('<p class="section-label">SHAP Force Plot</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-label">Force Plot</p>', unsafe_allow_html=True)
         fig = plt.figure(figsize=(10, 3))
         shap.force_plot(
             explainer.expected_value,
@@ -320,7 +376,7 @@ def display_shap_plots(model, scaler, input_data, feature_names):
         plt.close(fig)
 
     with col_waterfall:
-        st.markdown('<p class="section-label">Feature Contributions</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-label">Waterfall Plot</p>', unsafe_allow_html=True)
         explanation = shap.Explanation(
             values=shap_values[0],
             base_values=explainer.expected_value,
@@ -331,6 +387,18 @@ def display_shap_plots(model, scaler, input_data, feature_names):
         shap.plots.waterfall(explanation, show=False)
         st.pyplot(fig_wf, bbox_inches='tight')
         plt.close(fig_wf)
+
+    with col_decision:
+        st.markdown('<p class="section-label">Decision Plot</p>', unsafe_allow_html=True)
+        fig_dp, ax_dp = plt.subplots(figsize=(10, 4))
+        shap.decision_plot(
+            explainer.expected_value,
+            shap_values,
+            feature_names=feature_names,
+            show=False
+        )
+        st.pyplot(fig_dp, bbox_inches='tight')
+        plt.close(fig_dp)
 
 
 # Human-readable feature descriptions for clinicians
@@ -354,15 +422,25 @@ def main():
     4. On button click, runs inference and displays:
        - Predicted class with confidence percentage.
        - Class probability metrics.
-       - SHAP force and waterfall plots for interpretability.
-    5. Populates the sidebar with model metadata and feature boundary tables.
+       - SHAP force, waterfall, and decision plots for interpretability.
+    5. Populates the sidebar with model metadata, feature boundaries, and citation.
     """
 
     # Header
     st.markdown('''
     <div class="clinical-header">
-        <h1>👁️ Keratoconus Progression Predictor</h1>
-        <p>Clinical Decision Support — Logistic Regression Model (3 Pentacam Features)</p>
+        <h1>👁️ Keratoconus 1-Year Progression Predictor</h1>
+        <p>Interactive Demonstration — Logistic Regression Model with 3 Baseline Pentacam Features</p>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    # Research notice
+    st.markdown('''
+    <div class="research-notice">
+        <b>Not for clinical use.</b> This application is a research demonstration accompanying the publication
+        <i>"Predicting Keratoconus Progression Within 1–2 Years Using Baseline Tomography and an Explainable
+        Open-Access Machine Learning Model"</i> by Gil P, Gil JQ, Mendes L, Alves N, Rosa A, Murta J.
+        It is intended solely to illustrate the algorithm's behaviour and is not a validated medical device.
     </div>
     ''', unsafe_allow_html=True)
 
@@ -371,7 +449,7 @@ def main():
     feature_names = list(boundaries.keys())
 
     # --- Input Section ---
-    st.markdown('<p class="section-label">Patient Examination Data</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-label">Baseline Pentacam Measurements</p>', unsafe_allow_html=True)
 
     input_cols = st.columns(len(feature_names))
     inputs = {}
@@ -398,15 +476,15 @@ def main():
             is_valid, error_msg = validate_input(value, feature, boundaries)
             if not is_valid:
                 validation_errors.append(error_msg)
-                st.markdown(f'<span class="validation-warn">Outside training range</span>', unsafe_allow_html=True)
+                st.markdown('<span class="validation-warn">Outside training range</span>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<span class="validation-ok">Within range</span>', unsafe_allow_html=True)
+                st.markdown('<span class="validation-ok">Within range</span>', unsafe_allow_html=True)
 
     # --- Predict ---
     st.markdown("")
     predict_col1, predict_col2, predict_col3 = st.columns([1, 2, 1])
     with predict_col2:
-        predict_clicked = st.button("Analyse Progression Risk", type="primary", use_container_width=True)
+        predict_clicked = st.button("Estimate 1-Year Progression Risk", type="primary", use_container_width=True)
 
     if predict_clicked:
         if validation_errors:
@@ -433,7 +511,7 @@ def main():
                         <div class="result-card result-progression">
                             <h2>PROGRESSION RISK DETECTED</h2>
                             <div class="confidence">{prob_progression:.1%}</div>
-                            <div class="label">Probability of progression within 1 year</div>
+                            <div class="label">Estimated probability of progression within 1 year</div>
                         </div>
                         ''', unsafe_allow_html=True)
                     else:
@@ -441,7 +519,7 @@ def main():
                         <div class="result-card result-stable">
                             <h2>LOW PROGRESSION RISK</h2>
                             <div class="confidence">{prob_stable:.1%}</div>
-                            <div class="label">Probability of stability within 1 year</div>
+                            <div class="label">Estimated probability of stability within 1 year</div>
                         </div>
                         ''', unsafe_allow_html=True)
 
@@ -457,14 +535,15 @@ def main():
                             </div>
                         </div>
                         <div class="prob-labels">
-                            <span>Stable (Class 0)</span>
-                            <span>Progression (Class 1) — {prob_progression:.1%}</span>
+                            <span>Stable (No Progression)</span>
+                            <span>Progression — {prob_progression:.1%}</span>
                         </div>
                     </div>
                     ''', unsafe_allow_html=True)
 
                 # --- SHAP Explainability ---
                 st.markdown("")
+                st.markdown('<p class="section-label">Model Explainability (SHAP Analysis)</p>', unsafe_allow_html=True)
                 display_shap_plots(model, scaler, input_array, feature_names)
 
             except Exception as e:
@@ -498,13 +577,26 @@ def main():
         ''', unsafe_allow_html=True)
 
         st.markdown("---")
+
+        st.markdown("""
+        <div class="citation-box">
+            <b>Citation</b><br>
+            Gil P, Gil JQ, Mendes L, Alves N, Rosa A, Murta J.
+            <i>"Predicting Keratoconus Progression Within 1–2 Years Using
+            Baseline Tomography and an Explainable Open-Access Machine
+            Learning Model."</i>
+        </div>
+        """, unsafe_allow_html=True)
+
         st.markdown("""
         <div class="disclaimer">
-            <b>Research Use Only</b><br>
-            This tool is intended for research and educational purposes.
-            It is not a certified medical device and must not be used as the
-            sole basis for clinical decisions. Always correlate with full
-            clinical examination.
+            <b>Research Demonstration Only</b><br>
+            This application is provided for research and educational
+            purposes to demonstrate the algorithm described in the
+            accompanying publication. It is <b>not</b> a certified or
+            validated medical device and must <b>not</b> be used for
+            clinical decision-making. Predictions are illustrative and
+            should not replace professional ophthalmological assessment.
         </div>
         """, unsafe_allow_html=True)
 
