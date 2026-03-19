@@ -362,18 +362,20 @@ def display_shap_plots(model, scaler, input_data, feature_names):
 
     with col_force:
         st.markdown('<p class="section-label">Force Plot</p>', unsafe_allow_html=True)
-        fig = plt.figure(figsize=(10, 3))
+        # force_plot creates its own figure, so grab it with plt.gcf()
         shap.force_plot(
             explainer.expected_value,
-            shap_values,
-            input_data,
+            shap_values[0],
+            input_data[0],
             feature_names=feature_names,
             matplotlib=True,
             show=False
         )
+        fig_fp = plt.gcf()
+        fig_fp.set_size_inches(10, 3)
         plt.tight_layout()
-        st.pyplot(fig, bbox_inches='tight')
-        plt.close(fig)
+        st.pyplot(fig_fp, bbox_inches='tight')
+        plt.close(fig_fp)
 
     with col_waterfall:
         st.markdown('<p class="section-label">Waterfall Plot</p>', unsafe_allow_html=True)
