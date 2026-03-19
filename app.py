@@ -21,10 +21,10 @@ Features:
     - No patient data required at runtime
 
 Dependencies:
-    streamlit, numpy, pandas, joblib, shap, matplotlib
+    streamlit, numpy, joblib, shap, matplotlib
 
 Usage:
-    streamlit run app_lite.py
+    streamlit run app.py
 """
 
 import streamlit as st
@@ -38,23 +38,184 @@ from pathlib import Path
 APP_DIR = Path(__file__).parent
 
 # Page configuration
-st.set_page_config(page_title="Keratoconus Progression Predictor", layout="wide")
+st.set_page_config(
+    page_title="Keratoconus Progression Predictor",
+    page_icon="👁️",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-# Custom CSS for better styling
+# Clinical-grade CSS
 st.markdown('''
 <style>
-    .stAlert {
-        padding: 1rem;
-        margin: 1rem 0;
+    /* Hide Streamlit branding for cleaner clinical look */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+
+    /* Header banner */
+    .clinical-header {
+        background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%);
+        color: white;
+        padding: 1.5rem 2rem;
+        border-radius: 0.75rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
     }
-    .feature-stats {
-        background-color: #f0f2f6;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
+    .clinical-header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+    .clinical-header p {
+        margin: 0.4rem 0 0 0;
+        font-size: 0.95rem;
+        opacity: 0.9;
+    }
+
+    /* Input card */
+    .input-card {
+        background: #ffffff;
+        border: 1px solid #d5dbdb;
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .input-card h3 {
+        color: #1a5276;
+        margin-top: 0;
+        font-size: 1.1rem;
+        border-bottom: 2px solid #2980b9;
+        padding-bottom: 0.5rem;
+    }
+
+    /* Result cards */
+    .result-card {
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        text-align: center;
         margin: 0.5rem 0;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .result-progression {
+        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        color: white;
+    }
+    .result-stable {
+        background: linear-gradient(135deg, #27ae60 0%, #1e8449 100%);
+        color: white;
+    }
+    .result-card h2 {
+        margin: 0 0 0.3rem 0;
+        font-size: 1.5rem;
+    }
+    .result-card .confidence {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin: 0.5rem 0;
+    }
+    .result-card .label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+
+    /* Probability bar */
+    .prob-container {
+        background: #f8f9fa;
+        border-radius: 0.75rem;
+        padding: 1.2rem;
+        border: 1px solid #d5dbdb;
+    }
+    .prob-bar-track {
+        background: #e8e8e8;
+        border-radius: 1rem;
+        height: 2rem;
+        position: relative;
+        overflow: hidden;
+        margin: 0.5rem 0;
+    }
+    .prob-bar-fill-stable {
+        background: linear-gradient(90deg, #27ae60, #2ecc71);
+        height: 100%;
+        border-radius: 1rem 0 0 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 0.85rem;
+        min-width: 3rem;
+    }
+    .prob-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        color: #7f8c8d;
+        margin-top: 0.25rem;
+    }
+
+    /* Feature reference table */
+    .ref-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+    .ref-table th {
+        background: #1a5276;
+        color: white;
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        font-weight: 500;
+    }
+    .ref-table td {
+        padding: 0.4rem 0.75rem;
+        border-bottom: 1px solid #ecf0f1;
+    }
+    .ref-table tr:nth-child(even) {
+        background: #f8f9fa;
+    }
+
+    /* Validation badge */
+    .validation-ok {
+        color: #27ae60;
+        font-weight: 500;
+    }
+    .validation-warn {
+        color: #e74c3c;
+        font-weight: 500;
+    }
+
+    /* Section divider */
+    .section-label {
+        color: #1a5276;
+        font-size: 1rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 1.5rem 0 0.75rem 0;
+        padding-bottom: 0.4rem;
+        border-bottom: 2px solid #2980b9;
+    }
+
+    /* Disclaimer */
+    .disclaimer {
+        background: #fef9e7;
+        border-left: 4px solid #f39c12;
+        padding: 0.75rem 1rem;
+        border-radius: 0 0.5rem 0.5rem 0;
+        font-size: 0.8rem;
+        color: #7d6608;
+        margin-top: 1.5rem;
+    }
+
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background: #f8f9fa;
     }
 </style>
 ''', unsafe_allow_html=True)
+
 
 @st.cache_resource
 def load_model_and_data():
@@ -79,6 +240,7 @@ def load_model_and_data():
         st.error(f"Error loading files: {e}")
         st.stop()
 
+
 def validate_input(value, feature_name, boundaries):
     """Check whether a feature value falls within training data boundaries.
 
@@ -94,8 +256,9 @@ def validate_input(value, feature_name, boundaries):
     max_val = boundaries[feature_name]['max']
 
     if value < min_val or value > max_val:
-        return False, f"⚠️ {feature_name} must be between {min_val:.3f} and {max_val:.3f}"
+        return False, f"{feature_name} is outside training range [{min_val:.3f}, {max_val:.3f}]"
     return True, ""
+
 
 @st.cache_resource
 def get_shap_explainer(_model, _scaler):
@@ -112,11 +275,11 @@ def get_shap_explainer(_model, _scaler):
     Returns:
         shap.LinearExplainer: Explainer instance ready to compute SHAP values.
     """
-    # In scaled space, the training mean is the zero vector
     background = np.zeros((1, len(_scaler.mean_)))
     return shap.LinearExplainer(_model, background)
 
-def display_shap_force_plot(model, scaler, input_data, feature_names):
+
+def display_shap_plots(model, scaler, input_data, feature_names):
     """Render SHAP force plot and waterfall plot for a single prediction.
 
     Generates two matplotlib-based visualizations (chosen for Streamlit Cloud
@@ -139,32 +302,44 @@ def display_shap_force_plot(model, scaler, input_data, feature_names):
     explainer = get_shap_explainer(model, scaler)
     shap_values = explainer.shap_values(input_data)
 
-    # Use matplotlib-based force plot (reliable on Streamlit Cloud)
-    fig = plt.figure(figsize=(12, 3))
-    shap.force_plot(
-        explainer.expected_value,
-        shap_values,
-        input_data,
-        feature_names=feature_names,
-        matplotlib=True,
-        show=False
-    )
-    plt.tight_layout()
-    st.pyplot(fig, bbox_inches='tight')
-    plt.close(fig)
+    col_force, col_waterfall = st.columns(2)
 
-    # Also show a waterfall plot for clearer feature breakdown
-    st.markdown("#### Feature Contribution Breakdown")
-    explanation = shap.Explanation(
-        values=shap_values[0],
-        base_values=explainer.expected_value,
-        data=input_data[0],
-        feature_names=feature_names
-    )
-    fig_wf, ax_wf = plt.subplots(figsize=(10, 4))
-    shap.plots.waterfall(explanation, show=False)
-    st.pyplot(fig_wf, bbox_inches='tight')
-    plt.close(fig_wf)
+    with col_force:
+        st.markdown('<p class="section-label">SHAP Force Plot</p>', unsafe_allow_html=True)
+        fig = plt.figure(figsize=(10, 3))
+        shap.force_plot(
+            explainer.expected_value,
+            shap_values,
+            input_data,
+            feature_names=feature_names,
+            matplotlib=True,
+            show=False
+        )
+        plt.tight_layout()
+        st.pyplot(fig, bbox_inches='tight')
+        plt.close(fig)
+
+    with col_waterfall:
+        st.markdown('<p class="section-label">Feature Contributions</p>', unsafe_allow_html=True)
+        explanation = shap.Explanation(
+            values=shap_values[0],
+            base_values=explainer.expected_value,
+            data=input_data[0],
+            feature_names=feature_names
+        )
+        fig_wf, ax_wf = plt.subplots(figsize=(10, 4))
+        shap.plots.waterfall(explanation, show=False)
+        st.pyplot(fig_wf, bbox_inches='tight')
+        plt.close(fig_wf)
+
+
+# Human-readable feature descriptions for clinicians
+FEATURE_LABELS = {
+    "BAD-D": "BAD-D (Belin/Ambrosio Enhanced Ectasia Display)",
+    "Age at Baseline": "Age at Baseline (years)",
+    "ARC 3mm Zone": "ARC 3mm Zone (Anterior Radius of Curvature)",
+}
+
 
 def main():
     """Main Streamlit application entry point.
@@ -182,31 +357,32 @@ def main():
        - SHAP force and waterfall plots for interpretability.
     5. Populates the sidebar with model metadata and feature boundary tables.
     """
-    st.title("🔮 Keratoconus Progression Predictor")
-    st.markdown("### Logistic Regression Model with 3 Clinical Features")
+
+    # Header
+    st.markdown('''
+    <div class="clinical-header">
+        <h1>👁️ Keratoconus Progression Predictor</h1>
+        <p>Clinical Decision Support — Logistic Regression Model (3 Pentacam Features)</p>
+    </div>
+    ''', unsafe_allow_html=True)
 
     # Load model and data
     model, scaler, boundaries = load_model_and_data()
     feature_names = list(boundaries.keys())
 
-    # Create input form
-    st.markdown("---")
-    st.subheader("📊 Input Features")
+    # --- Input Section ---
+    st.markdown('<p class="section-label">Patient Examination Data</p>', unsafe_allow_html=True)
 
-    # Create two columns for layout
-    col1, col2 = st.columns([2, 1])
+    input_cols = st.columns(len(feature_names))
+    inputs = {}
+    validation_errors = []
 
-    with col1:
-        st.markdown("#### Enter feature values:")
+    for i, feature in enumerate(feature_names):
+        bounds = boundaries[feature]
+        label = FEATURE_LABELS.get(feature, feature)
 
-        # Collect inputs with validation
-        inputs = {}
-        validation_errors = []
-
-        for feature in feature_names:
-            bounds = boundaries[feature]
-
-            # Input with default value at mean
+        with input_cols[i]:
+            st.markdown(f'<div class="input-card"><h3>{label}</h3></div>', unsafe_allow_html=True)
             value = st.number_input(
                 f"{feature}",
                 min_value=float(bounds['min'] - abs(bounds['min']) * 0.5),
@@ -214,95 +390,124 @@ def main():
                 value=float(bounds['mean']),
                 step=float(bounds['std'] / 10),
                 key=feature,
-                help=f"Valid range: [{bounds['min']:.3f}, {bounds['max']:.3f}]"
+                label_visibility="collapsed",
+                help=f"Training range: [{bounds['min']:.3f} — {bounds['max']:.3f}] | Mean: {bounds['mean']:.3f} | SD: {bounds['std']:.3f}"
             )
             inputs[feature] = value
 
-            # Validate input
             is_valid, error_msg = validate_input(value, feature, boundaries)
             if not is_valid:
                 validation_errors.append(error_msg)
+                st.markdown(f'<span class="validation-warn">Outside training range</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<span class="validation-ok">Within range</span>', unsafe_allow_html=True)
 
-    with col2:
-        st.markdown("#### Current Input Values:")
-        for feature, value in inputs.items():
-            bounds = boundaries[feature]
-            in_range = bounds['min'] <= value <= bounds['max']
-            icon = "✅" if in_range else "⚠️"
-            st.markdown(f"{icon} **{feature}**: {value:.3f}")
+    # --- Predict ---
+    st.markdown("")
+    predict_col1, predict_col2, predict_col3 = st.columns([1, 2, 1])
+    with predict_col2:
+        predict_clicked = st.button("Analyse Progression Risk", type="primary", use_container_width=True)
 
-    st.markdown("---")
-
-    # Prediction button
-    if st.button("🎯 Make Prediction", type="primary", use_container_width=True):
-        # Check for validation errors
+    if predict_clicked:
         if validation_errors:
-            st.error("### ❌ Input Validation Errors")
+            st.error("**Input Validation Errors**")
             for error in validation_errors:
-                st.error(error)
-            st.warning("Please adjust your inputs to be within the training data range.")
+                st.warning(error)
         else:
-            # Create input array and scale it
             input_raw = np.array([[inputs[f] for f in feature_names]])
             input_array = scaler.transform(input_raw)
 
-            # Make prediction
             try:
                 prediction = model.predict(input_array)[0]
                 probability = model.predict_proba(input_array)[0]
+                prob_stable = probability[0]
+                prob_progression = probability[1]
 
-                # Display result
-                st.markdown("---")
-                st.subheader("🎯 Prediction Result")
+                # --- Result Display ---
+                st.markdown("")
+                res_col1, res_col2, res_col3 = st.columns([1, 3, 1])
 
-                result_col1, result_col2, result_col3 = st.columns([1, 2, 1])
-
-                with result_col2:
+                with res_col2:
                     if prediction == 1:
-                        st.error("### ⚠️ WARNING")
-                        st.markdown(f"**Class: 1** (Positive)")
-                        st.markdown(f"**Confidence:** {probability[1]:.1%}")
+                        st.markdown(f'''
+                        <div class="result-card result-progression">
+                            <h2>PROGRESSION RISK DETECTED</h2>
+                            <div class="confidence">{prob_progression:.1%}</div>
+                            <div class="label">Probability of progression within 1 year</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
                     else:
-                        st.success("### ✅ OK")
-                        st.markdown(f"**Class: 0** (Negative)")
-                        st.markdown(f"**Confidence:** {probability[0]:.1%}")
+                        st.markdown(f'''
+                        <div class="result-card result-stable">
+                            <h2>LOW PROGRESSION RISK</h2>
+                            <div class="confidence">{prob_stable:.1%}</div>
+                            <div class="label">Probability of stability within 1 year</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
 
-                # Display probabilities
-                st.markdown("---")
-                st.subheader("📈 Class Probabilities")
-                prob_col1, prob_col2 = st.columns(2)
-
-                with prob_col1:
-                    st.metric("Class 0 (OK)", f"{probability[0]:.1%}")
+                # --- Probability Breakdown ---
+                st.markdown("")
+                prob_col1, prob_col2, prob_col3 = st.columns([1, 3, 1])
                 with prob_col2:
-                    st.metric("Class 1 (Warning)", f"{probability[1]:.1%}")
+                    st.markdown(f'''
+                    <div class="prob-container">
+                        <div class="prob-bar-track">
+                            <div class="prob-bar-fill-stable" style="width: {prob_stable*100:.1f}%">
+                                Stable {prob_stable:.1%}
+                            </div>
+                        </div>
+                        <div class="prob-labels">
+                            <span>Stable (Class 0)</span>
+                            <span>Progression (Class 1) — {prob_progression:.1%}</span>
+                        </div>
+                    </div>
+                    ''', unsafe_allow_html=True)
 
-                # Display SHAP force plot
-                st.markdown("---")
-                st.subheader("🔍 Feature Importance (SHAP Analysis)")
-                st.markdown("This plot shows how each feature contributes to the prediction:")
-                display_shap_force_plot(model, scaler, input_array, feature_names)
+                # --- SHAP Explainability ---
+                st.markdown("")
+                display_shap_plots(model, scaler, input_array, feature_names)
 
             except Exception as e:
                 st.error(f"Prediction error: {str(e)}")
                 st.exception(e)
 
-    # Display model info in sidebar
+    # --- Sidebar ---
     with st.sidebar:
-        st.markdown("### 📋 Model Information")
-        st.info(f"**Model Type:** Logistic Regression\n**Features:** {len(feature_names)}\n**Training Samples:** 412")
+        st.markdown("### Model Details")
+        st.markdown("""
+        | Property | Value |
+        |----------|-------|
+        | Algorithm | Logistic Regression |
+        | Features | 3 |
+        | Training set | 412 patients |
+        | Balancing | SMOTE (k=5) |
+        | Preprocessing | StandardScaler |
+        | Prediction window | 1 year |
+        """)
 
-        st.markdown("### 📊 Feature Boundaries")
+        st.markdown("### Feature Reference Ranges")
+        table_rows = ""
         for feature, bounds in boundaries.items():
-            st.markdown(f"**{feature}**")
-            st.markdown(f"- Min: {bounds['min']:.3f}")
-            st.markdown(f"- Max: {bounds['max']:.3f}")
-            st.markdown(f"- Mean: {bounds['mean']:.3f}")
+            table_rows += f"<tr><td><b>{feature}</b></td><td>{bounds['min']:.3f}</td><td>{bounds['max']:.3f}</td><td>{bounds['mean']:.3f}</td><td>{bounds['std']:.3f}</td></tr>"
+
+        st.markdown(f'''
+        <table class="ref-table">
+            <thead><tr><th>Feature</th><th>Min</th><th>Max</th><th>Mean</th><th>SD</th></tr></thead>
+            <tbody>{table_rows}</tbody>
+        </table>
+        ''', unsafe_allow_html=True)
 
         st.markdown("---")
-        st.markdown("### ℹ️ About")
-        st.markdown("This app uses a trained logistic regression model for binary classification. "
-                   "All inputs are validated against training data boundaries to ensure reliable predictions.")
+        st.markdown("""
+        <div class="disclaimer">
+            <b>Research Use Only</b><br>
+            This tool is intended for research and educational purposes.
+            It is not a certified medical device and must not be used as the
+            sole basis for clinical decisions. Always correlate with full
+            clinical examination.
+        </div>
+        """, unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()
