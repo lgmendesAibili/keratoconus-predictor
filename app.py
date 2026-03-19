@@ -94,8 +94,7 @@ def display_shap_force_plot(model, X_train, input_data, feature_names):
         explainer = get_shap_explainer(model, X_train)
         shap_values = explainer.shap_values(input_data)
 
-        # Generate force plot
-        shap.initjs()
+        # Generate force plot (matplotlib=False returns an HTML object)
         force_plot = shap.force_plot(
             explainer.expected_value,
             shap_values,
@@ -104,12 +103,12 @@ def display_shap_force_plot(model, X_train, input_data, feature_names):
             matplotlib=False
         )
 
-        # Convert to HTML and display
+        # Embed SHAP JS + force plot HTML directly (no initjs() needed)
         shap_html = f"<head>{shap.getjs()}</head><body>{force_plot.html()}</body>"
         components.html(shap_html, height=150)
 
     except Exception as e:
-        st.warning(f"Could not generate SHAP plot: {str(e)}")
+        st.warning(f"Could not generate interactive SHAP plot: {str(e)}")
         # Fallback: show matplotlib version
         try:
             explainer = get_shap_explainer(model, X_train)
