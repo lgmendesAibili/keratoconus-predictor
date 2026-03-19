@@ -363,25 +363,7 @@ def display_shap_plots(model, scaler, input_data, feature_names):
     plt.rcParams['figure.dpi'] = plot_dpi
     plt.rcParams['savefig.dpi'] = plot_dpi
 
-    col_force, col_waterfall, col_decision = st.columns(3)
-
-    with col_force:
-        st.markdown('<p class="section-label">Force Plot</p>', unsafe_allow_html=True)
-        # force_plot creates its own figure, so grab it with plt.gcf()
-        shap.force_plot(
-            explainer.expected_value,
-            shap_values[0],
-            input_data[0],
-            feature_names=feature_names,
-            matplotlib=True,
-            show=False
-        )
-        fig_fp = plt.gcf()
-        fig_fp.set_dpi(plot_dpi)
-        fig_fp.set_size_inches(10, 3)
-        plt.tight_layout()
-        st.pyplot(fig_fp, bbox_inches='tight', dpi=plot_dpi)
-        plt.close(fig_fp)
+    col_waterfall, col_decision = st.columns(2)
 
     with col_waterfall:
         st.markdown('<p class="section-label">Waterfall Plot</p>', unsafe_allow_html=True)
@@ -411,7 +393,7 @@ def display_shap_plots(model, scaler, input_data, feature_names):
 
 # Human-readable feature descriptions for clinicians
 FEATURE_LABELS = {
-    "BAD-D": "BAD-D (Belin/Ambrosio Enhanced Ectasia Display)",
+    "BAD-D": "BAD-D",
     "Age at Baseline": "Age at Baseline (years)",
     "ARC 3mm Zone": "ARC 3mm Zone (Anterior Radius of Curvature)",
 }
