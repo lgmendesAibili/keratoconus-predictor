@@ -307,12 +307,16 @@ def display_shap_plots(model, scaler, input_data, feature_names):
 
     st.markdown('''
     <div class="shap-guide">
-        <b>How to read these plots:</b> Each feature either pushes the prediction
-        toward <b style="color:#c0392b">progression</b> (positive SHAP value) or
-        toward <b style="color:#27ae60">stability</b> (negative SHAP value).
-        The magnitude indicates how strongly that feature influences this
-        individual prediction. The base value represents the average model output
-        across the training population.
+        <b>How to read these plots:</b><br>
+        <b>Waterfall plot:</b> Shows each feature's individual contribution to the prediction.
+        Bars extending to the <b style="color:#c0392b">right (red)</b> push the output toward
+        progression; bars to the <b style="color:#2980b9">left (blue)</b> push toward stability.
+        The bar length indicates how strongly that feature influences this individual case.
+        E[f(x)] is the base value (average model output across the training population).<br>
+        <b>Decision plot:</b> Traces the cumulative path from the base value (vertical grey line)
+        to the final model output. Each line segment shows the shift caused by one feature,
+        applied sequentially from bottom to top. A final value to the right of the base value
+        indicates a prediction toward progression; to the left, toward stability.
     </div>
     ''', unsafe_allow_html=True)
 
