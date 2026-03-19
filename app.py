@@ -20,7 +20,7 @@ window) with SMOTE balancing and StandardScaler preprocessing.
 
 Features:
     - Input validation against training data boundaries
-    - SHAP force plot, waterfall plot, and decision plot for interpretability
+    - SHAP waterfall plot and decision plot for interpretability
     - Probability display for both classes
     - StandardScaler preprocessing matching the training pipeline
     - No patient data required at runtime
@@ -323,16 +323,14 @@ def get_shap_explainer(_model, _scaler):
 
 
 def display_shap_plots(model, scaler, input_data, feature_names):
-    """Render SHAP force plot, waterfall plot, and decision plot for a prediction.
+    """Render SHAP waterfall plot and decision plot for a prediction.
 
-    Generates three matplotlib-based visualizations (chosen for Streamlit Cloud
+    Generates two matplotlib-based visualizations (chosen for Streamlit Cloud
     compatibility over JavaScript-based alternatives):
 
-    1. **Force plot** — horizontal bar showing how each feature pushes the
-       prediction from the base value toward the final output.
-    2. **Waterfall plot** — vertical breakdown of individual feature
+    1. **Waterfall plot** — vertical breakdown of individual feature
        contributions ordered by magnitude.
-    3. **Decision plot** — cumulative path from the base value to the final
+    2. **Decision plot** — cumulative path from the base value to the final
        prediction, showing how each feature shifts the output sequentially.
 
     All matplotlib figures are explicitly closed after rendering to prevent
@@ -407,12 +405,12 @@ def main():
     1. Loads model artifacts via ``load_model_and_data()``.
     2. Renders input fields (one per clinical feature) with defaults set to
        training-data means, step sizes of ``std / 10``, and an extended
-       min/max range of +/-50 % to allow exploratory inputs.
+       min/max range of +/-1 SD to allow exploratory inputs.
     3. Shows a live validation summary.
     4. On button click, runs inference and displays:
        - Predicted class with confidence percentage.
        - Class probability metrics.
-       - SHAP force, waterfall, and decision plots for interpretability.
+       - SHAP waterfall and decision plots for interpretability.
     5. Populates the sidebar with model metadata, feature boundaries, and citation.
     """
 
