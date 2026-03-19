@@ -53,7 +53,19 @@ st.markdown('''
 
 @st.cache_resource
 def load_model_and_data():
-    '''Load the trained model, boundaries, and training data'''
+    """Load the trained model, feature boundaries, and training data from disk.
+
+    Returns:
+        tuple: A 3-tuple of (model, boundaries, X_train) where:
+            - model: sklearn LogisticRegression fitted classifier.
+            - boundaries: dict mapping feature names to dicts with keys
+              'min', 'max', 'mean', 'std'.
+            - X_train: numpy.ndarray of shape (n_samples, 5) used for
+              SHAP explainer initialization and sparkline distributions.
+
+    Raises:
+        SystemExit: Stops the Streamlit app if pickle files are missing.
+    """
     try:
         model = joblib.load(APP_DIR / 'logistic_model.pkl')
         boundaries = joblib.load(APP_DIR / 'boundaries.pkl')
@@ -64,7 +76,17 @@ def load_model_and_data():
         st.stop()
 
 def create_sparkline(data):
-    '''Create sparkline visualization for a feature distribution'''
+    """Create a Unicode sparkline showing the distribution of a feature.
+
+    Bins the data into a 20-bin histogram, normalizes to 0-8 range, and
+    converts to Unicode block characters via the ``sparklines`` library.
+
+    Args:
+        data: 1-D array-like of numeric values (typically one column of X_train).
+
+    Returns:
+        str: Unicode sparkline string, or a default block-character string on error.
+    """
     try:
         hist, _ = np.histogram(data, bins=20)
         # Normalize histogram for better visualization
@@ -75,7 +97,16 @@ def create_sparkline(data):
         return "▁▂▃▄▅▆▇█"  # Default sparkline on error
 
 def validate_input(value, feature_name, boundaries):
-    '''Validate that input is within training data boundaries'''
+    """Check whether a feature value falls within training data boundaries.
+
+    Args:
+        value: Numeric value entered by the user.
+        feature_name: Name of the clinical feature (must be a key in *boundaries*).
+        boundaries: dict mapping feature names to boundary dicts with 'min' and 'max'.
+
+    Returns:
+        tuple[bool, str]: (is_valid, error_message). *error_message* is empty when valid.
+    """
     min_val = boundaries[feature_name]['min']
     max_val = boundaries[feature_name]['max']
 
@@ -85,11 +116,40 @@ def validate_input(value, feature_name, boundaries):
 
 @st.cache_resource
 def get_shap_explainer(_model, _X_train):
-    '''Create and cache the SHAP explainer'''
+    """Create and cache a SHAP LinearExplainer for the logistic regression model.
+
+    Uses ``@st.cache_resource`` so the explainer is built only once per session.
+    Leading underscores on parameters tell Streamlit not to hash them.
+
+    Args:
+        _model: Fitted sklearn LogisticRegression estimator.
+        _X_train: numpy.ndarray of training data used as background distribution.
+
+    Returns:
+        shap.LinearExplainer: Explainer instance ready to compute SHAP values.
+    """
     return shap.LinearExplainer(_model, _X_train)
 
 def display_shap_force_plot(model, X_train, input_data, feature_names):
-    '''Display SHAP force plot for the input'''
+    """Render SHAP force plot and waterfall plot for a single prediction.
+
+    Generates two matplotlib-based visualizations (chosen for Streamlit Cloud
+    compatibility over JavaScript-based alternatives):
+
+    1. **Force plot** — horizontal bar showing how each feature pushes the
+       prediction from the base value toward the final output.
+    2. **Waterfall plot** — vertical breakdown of individual feature
+       contributions ordered by magnitude.
+
+    All matplotlib figures are explicitly closed after rendering to prevent
+    memory leaks in long-running Streamlit sessions.
+
+    Args:
+        model: Fitted sklearn LogisticRegression estimator.
+        X_train: numpy.ndarray of training data for the SHAP background.
+        input_data: numpy.ndarray of shape (1, n_features) with user inputs.
+        feature_names: list[str] of feature names matching input_data columns.
+    """
     explainer = get_shap_explainer(model, X_train)
     shap_values = explainer.shap_values(input_data)
 
@@ -123,8 +183,18 @@ def display_shap_force_plot(model, X_train, input_data, feature_names):
 def main():
     """Main Streamlit application entry point.
 
-    Renders the prediction interface with input fields, validation,
-    model inference, probability display, and SHAP force plot visualization.
+    Orchestrates the full prediction workflow:
+
+    1. Loads model artifacts via ``load_model_and_data()``.
+    2. Renders input fields (one per clinical feature) with defaults set to
+       training-data means, step sizes of ``std / 10``, and an extended
+       min/max range of ±50 % to allow exploratory inputs.
+    3. Shows inline sparkline distributions and a live validation summary.
+    4. On button click, runs inference and displays:
+       - Predicted class with confidence percentage.
+       - Class probability metrics.
+       - SHAP force and waterfall plots for interpretability.
+    5. Populates the sidebar with model metadata and feature boundary tables.
     """
     st.title("🔮 Binary Classification Predictor")
     st.markdown("### Logistic Regression Model with 5 Numerical Inputs")
