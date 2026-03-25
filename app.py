@@ -444,8 +444,8 @@ def main():
 
         with input_cols[i]:
             st.markdown(f'<div class="input-card"><h3>{label}</h3></div>', unsafe_allow_html=True)
-            # Age is integer in the training data — enforce int input
-            if feature == "Age":
+            # Age and Pachy Min are integers in the training data — enforce int input
+            if feature in ("Age", "Pachy Min"):
                 value = st.number_input(
                     f"{feature}",
                     min_value=int(merged['min']),
