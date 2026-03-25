@@ -201,6 +201,33 @@ st.markdown('''
         border-left: 3px solid #2980b9;
     }
 
+    /* Model section containers */
+    .model-section {
+        border-radius: 0.75rem;
+        padding: 1.2rem 1.5rem;
+        margin: 1.5rem 0;
+    }
+    .model-section-1y,
+    .model-section-2y {
+        background: #f4f6f8;
+        border: none;
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .model-section-header {
+        font-size: 1.15rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        margin: 0;
+        padding-bottom: 0;
+    }
+    .model-section-1y .model-section-header {
+        color: #1a5276;
+    }
+    .model-section-2y .model-section-header {
+        color: #784212;
+    }
+
     /* Sidebar styling */
     [data-testid="stSidebar"] {
         background: #f8f9fa;
@@ -220,6 +247,7 @@ MODEL_CONFIGS = {
         "boundaries_file": "boundaries.pkl",
         "feature_names": ["BAD-D", "Age", "ARC 3mm"],
         "patients": 412,
+        "css_class": "model-section-1y",
     },
     "two_year": {
         "label": "2-Year Progression",
@@ -229,6 +257,7 @@ MODEL_CONFIGS = {
         "boundaries_file": "boundaries_twoYear.pkl",
         "feature_names": ["Kmax", "Age", "Pachy Min"],
         "patients": 412,
+        "css_class": "model-section-2y",
     },
 }
 
@@ -344,10 +373,10 @@ def display_shap_plots(model, scaler, input_data, input_raw, feature_names):
 # Human-readable feature descriptions for clinicians
 FEATURE_LABELS = {
     "BAD-D": "BAD-D",
-    "Age": "Age",
-    "ARC 3mm": "ARC 3mm (Anterior Radius of Curvature)",
-    "Kmax": "Kmax (Maximum Keratometry, D)",
-    "Pachy Min": "Pachy Min (Minimum Pachymetry, \u03bcm)",
+    "Age": "Age (years)",
+    "ARC 3mm": "ARC 3mm (mm)",
+    "Kmax": "Kmax (D)",
+    "Pachy Min": "Pachy Min (\u03bcm)",
 }
 
 # Ordered list of all 5 input features
@@ -483,13 +512,14 @@ def main():
                     config = MODEL_CONFIGS[model_key]
                     feature_names = config["feature_names"]
                     window = config["window"]
+                    css = config["css_class"]
 
                     input_raw = np.array([[inputs[f] for f in feature_names]])
                     input_scaled = scaler.transform(input_raw)
                     prediction = model.predict(input_scaled)[0]
 
-                    # Section header
-                    st.markdown(f'<p class="section-label">{config["label"]} Model</p>', unsafe_allow_html=True)
+                    # Styled model section container
+                    st.markdown(f'<div class="model-section {css}"><p class="model-section-header">{config["label"]} Model &mdash; Features: {", ".join(feature_names)}</p></div>', unsafe_allow_html=True)
 
                     # Result card
                     res_col1, res_col2, res_col3 = st.columns([1, 3, 1])
