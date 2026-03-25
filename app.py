@@ -303,7 +303,7 @@ def display_shap_guide():
     ''', unsafe_allow_html=True)
 
 
-def display_shap_plots(model, scaler, input_data, feature_names):
+def display_shap_plots(model, scaler, input_data, input_raw, feature_names):
     """Render SHAP waterfall plot and decision plot for a prediction."""
     explainer = get_shap_explainer(model, scaler)
     shap_values = explainer.shap_values(input_data)
@@ -320,7 +320,7 @@ def display_shap_plots(model, scaler, input_data, feature_names):
         explanation = shap.Explanation(
             values=shap_values[0],
             base_values=explainer.expected_value,
-            data=input_data[0],
+            data=input_raw[0],
             feature_names=feature_names
         )
         fig_wf, ax_wf = plt.subplots(figsize=(10, 4), dpi=plot_dpi)
@@ -344,14 +344,14 @@ def display_shap_plots(model, scaler, input_data, feature_names):
 # Human-readable feature descriptions for clinicians
 FEATURE_LABELS = {
     "BAD-D": "BAD-D",
-    "Age": "Age at Baseline (years)",
+    "Age": "Age",
     "ARC 3mm": "ARC 3mm (Anterior Radius of Curvature)",
     "Kmax": "Kmax (Maximum Keratometry, D)",
     "Pachy Min": "Pachy Min (Minimum Pachymetry, \u03bcm)",
 }
 
 # Ordered list of all 5 input features
-ALL_FEATURES = ["BAD-D", "Age", "ARC 3mm", "Kmax", "Pachy Min"]
+ALL_FEATURES = ["Age", "BAD-D", "ARC 3mm", "Kmax", "Pachy Min"]
 
 # Which model(s) use each feature (for help text)
 FEATURE_MODELS = {
@@ -415,17 +415,29 @@ def main():
 
         with input_cols[i]:
             st.markdown(f'<div class="input-card"><h3>{label}</h3></div>', unsafe_allow_html=True)
-            margin = merged['std']
-            value = st.number_input(
-                f"{feature}",
-                min_value=float(max(0, merged['min'] - margin)),
-                max_value=float(merged['max'] + margin),
-                value=float(merged['mean']),
-                step=float(merged['std'] / 10),
-                key=feature,
-                label_visibility="collapsed",
-                help=f"Used by: {used_by} | Range: [{merged['min']:.3f} — {merged['max']:.3f}] | Mean: {merged['mean']:.3f} | SD: {merged['std']:.3f}"
-            )
+            # Age is integer in the training data — enforce int input
+            if feature == "Age":
+                value = st.number_input(
+                    f"{feature}",
+                    min_value=int(merged['min']),
+                    max_value=int(merged['max']),
+                    value=round(merged['mean']),
+                    step=1,
+                    key=feature,
+                    label_visibility="collapsed",
+                    help=f"Used by: {used_by} | Range: [{int(merged['min'])} — {int(merged['max'])}] | Mean: {merged['mean']:.1f} | SD: {merged['std']:.1f}"
+                )
+            else:
+                value = st.number_input(
+                    f"{feature}",
+                    min_value=float(max(0, merged['min'])),
+                    max_value=float(merged['max']),
+                    value=float(merged['mean']),
+                    step=float(merged['std'] / 10),
+                    key=feature,
+                    label_visibility="collapsed",
+                    help=f"Used by: {used_by} | Range: [{merged['min']:.3f} — {merged['max']:.3f}] | Mean: {merged['mean']:.3f} | SD: {merged['std']:.3f}"
+                )
             inputs[feature] = value
 
             is_valid, _ = validate_input(value, feature, {"_": merged, feature: merged})
@@ -498,7 +510,7 @@ def main():
                             ''', unsafe_allow_html=True)
 
                     # SHAP plots
-                    display_shap_plots(model, scaler, input_scaled, feature_names)
+                    display_shap_plots(model, scaler, input_scaled, input_raw, feature_names)
 
             except Exception as e:
                 st.error(f"Prediction error: {str(e)}")

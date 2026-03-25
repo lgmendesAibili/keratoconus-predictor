@@ -37,8 +37,10 @@ streamlit run app.py
 
 - **No `predict_proba`** — the models output binary classification only, no probabilities are shown.
 - **SHAP background** — `np.zeros((1, n_features))` represents the training mean in scaled space; produces identical base values to using real training data.
-- **Widget input ranges** — ±1 SD beyond training min/max, clamped to 0 to prevent negative values for features like BAD-D.
+- **Widget input ranges** — clamped to training data min/max (no extrapolation beyond observed range). Minimum clamped to 0 for features like BAD-D.
+- **Age is integer-only** — enforced via `int` params on `st.number_input` (step=1), matching the training data where Age is always a whole number.
 - **Age is shared** — both models use Age but with slightly different scaler params (trained on different SMOTE sets). The input widget uses merged boundaries (widest range); each model scales independently with its own scaler.
+- **SHAP waterfall shows raw values** — the `data` field in `shap.Explanation` receives the user's original (unscaled) input so the plot displays actual clinical values (e.g., Age=24) rather than standardized z-scores.
 - **Force plot removed** — only waterfall and decision plots are displayed (force plot had rendering issues with individual predictions in Streamlit).
 - **`X_train.pkl` purged from git history** — patient data must never be committed. The file was removed using `git filter-repo`.
 
