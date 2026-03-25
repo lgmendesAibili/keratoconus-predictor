@@ -1,28 +1,18 @@
 """
 Keratoconus Progression Prediction — Streamlit Web Application (Privacy-Safe)
 
-Interactive demonstration of the machine learning model described in:
+Interactive demonstration of two machine learning models described in:
 
     Gil P, Gil JQ, Mendes L, Alves N, Rosa A, Murta J.
     "Predicting Keratoconus Progression Within 1-2 Years Using Baseline
     Tomography and an Explainable Open-Access Machine Learning Model"
 
-Users enter 3 baseline Pentacam features (BAD-D, Age, ARC 3mm) and receive
-a 1-year progression risk prediction with SHAP explanations showing how
-each feature drives the individual prediction.
+Users enter 5 baseline Pentacam features and receive predictions from both
+a 1-year model (BAD-D, Age, ARC 3mm) and a 2-year model (Kmax, Age,
+Pachy Min), each with SHAP explanations.
 
 SHAP explanations use a synthetic background derived from the fitted
 StandardScaler, requiring no patient data at runtime.
-
-The model was trained on real keratoconus data (412 patients, one-year prediction
-window) with SMOTE balancing and StandardScaler preprocessing.
-
-Features:
-    - Input validation against training data boundaries
-    - SHAP waterfall plot and decision plot for interpretability
-    - Binary classification result display
-    - StandardScaler preprocessing matching the training pipeline
-    - No patient data required at runtime
 
 Dependencies:
     streamlit, numpy, joblib, shap, matplotlib
@@ -219,27 +209,41 @@ st.markdown('''
 ''', unsafe_allow_html=True)
 
 
+# --- Model configurations ---
+
+MODEL_CONFIGS = {
+    "one_year": {
+        "label": "1-Year Progression",
+        "window": "1 year",
+        "model_file": "logistic_model.pkl",
+        "scaler_file": "scaler.pkl",
+        "boundaries_file": "boundaries.pkl",
+        "feature_names": ["BAD-D", "Age", "ARC 3mm"],
+        "patients": 412,
+    },
+    "two_year": {
+        "label": "2-Year Progression",
+        "window": "2 years",
+        "model_file": "logistic_model_twoYear.pkl",
+        "scaler_file": "scaler_twoYear.pkl",
+        "boundaries_file": "boundaries_twoYear.pkl",
+        "feature_names": ["Kmax", "Age", "Pachy Min"],
+        "patients": 412,
+    },
+}
+
+
 @st.cache_resource
-def load_model_and_data():
-    """Load the trained model, scaler, and feature boundaries.
-
-    Returns:
-        tuple: A 3-tuple of (model, scaler, boundaries) where:
-            - model: sklearn LogisticRegression fitted classifier.
-            - scaler: sklearn StandardScaler fitted on training data.
-            - boundaries: dict mapping feature names to dicts with keys
-              'min', 'max', 'mean', 'std'.
-
-    Raises:
-        SystemExit: Stops the Streamlit app if pickle files are missing.
-    """
+def load_model_and_data(model_key):
+    """Load a trained model, scaler, and feature boundaries by config key."""
+    config = MODEL_CONFIGS[model_key]
     try:
-        model = joblib.load(APP_DIR / 'logistic_model.pkl')
-        scaler = joblib.load(APP_DIR / 'scaler.pkl')
-        boundaries = joblib.load(APP_DIR / 'boundaries.pkl')
+        model = joblib.load(APP_DIR / config["model_file"])
+        scaler = joblib.load(APP_DIR / config["scaler_file"])
+        boundaries = joblib.load(APP_DIR / config["boundaries_file"])
         return model, scaler, boundaries
     except FileNotFoundError as e:
-        st.error(f"Error loading files: {e}")
+        st.error(f"Error loading {config['label']} files: {e}")
         st.stop()
 
 
@@ -281,29 +285,8 @@ def get_shap_explainer(_model, _scaler):
     return shap.LinearExplainer(_model, background)
 
 
-def display_shap_plots(model, scaler, input_data, feature_names):
-    """Render SHAP waterfall plot and decision plot for a prediction.
-
-    Generates two matplotlib-based visualizations (chosen for Streamlit Cloud
-    compatibility over JavaScript-based alternatives):
-
-    1. **Waterfall plot** — vertical breakdown of individual feature
-       contributions ordered by magnitude.
-    2. **Decision plot** — cumulative path from the base value to the final
-       prediction, showing how each feature shifts the output sequentially.
-
-    All matplotlib figures are explicitly closed after rendering to prevent
-    memory leaks in long-running Streamlit sessions.
-
-    Args:
-        model: Fitted sklearn LogisticRegression estimator.
-        scaler: Fitted sklearn StandardScaler.
-        input_data: numpy.ndarray of shape (1, n_features) with scaled user inputs.
-        feature_names: list[str] of feature names matching input_data columns.
-    """
-    explainer = get_shap_explainer(model, scaler)
-    shap_values = explainer.shap_values(input_data)
-
+def display_shap_guide():
+    """Render the SHAP explanation guide text (call once before plots)."""
     st.markdown('''
     <div class="shap-guide">
         <b>How to read these plots:</b><br>
@@ -318,6 +301,12 @@ def display_shap_plots(model, scaler, input_data, feature_names):
         indicates a prediction toward progression; to the left, toward stability.
     </div>
     ''', unsafe_allow_html=True)
+
+
+def display_shap_plots(model, scaler, input_data, feature_names):
+    """Render SHAP waterfall plot and decision plot for a prediction."""
+    explainer = get_shap_explainer(model, scaler)
+    shap_values = explainer.shap_values(input_data)
 
     # High DPI for crisp rendering on retina/HiDPI displays
     plot_dpi = 200
@@ -356,31 +345,45 @@ def display_shap_plots(model, scaler, input_data, feature_names):
 FEATURE_LABELS = {
     "BAD-D": "BAD-D",
     "Age": "Age at Baseline (years)",
-    "ARC 3mm": "ARC 3mm Zone (Anterior Radius of Curvature)",
+    "ARC 3mm": "ARC 3mm (Anterior Radius of Curvature)",
+    "Kmax": "Kmax (Maximum Keratometry, D)",
+    "Pachy Min": "Pachy Min (Minimum Pachymetry, \u03bcm)",
+}
+
+# Ordered list of all 5 input features
+ALL_FEATURES = ["BAD-D", "Age", "ARC 3mm", "Kmax", "Pachy Min"]
+
+# Which model(s) use each feature (for help text)
+FEATURE_MODELS = {
+    "BAD-D": "1-Year model",
+    "Age": "Both models",
+    "ARC 3mm": "1-Year model",
+    "Kmax": "2-Year model",
+    "Pachy Min": "2-Year model",
 }
 
 
+def _merge_bounds_for_feature(feature, all_boundaries):
+    """Merge boundaries from multiple models for a shared feature (e.g. Age)."""
+    sources = [b[feature] for b in all_boundaries if feature in b]
+    if len(sources) == 1:
+        return sources[0]
+    return {
+        "min": min(s["min"] for s in sources),
+        "max": max(s["max"] for s in sources),
+        "mean": sum(s["mean"] for s in sources) / len(sources),
+        "std": sum(s["std"] for s in sources) / len(sources),
+    }
+
+
 def main():
-    """Main Streamlit application entry point.
-
-    Orchestrates the full prediction workflow:
-
-    1. Loads model artifacts via ``load_model_and_data()``.
-    2. Renders input fields (one per clinical feature) with defaults set to
-       training-data means, step sizes of ``std / 10``, and an extended
-       min/max range of +/-1 SD to allow exploratory inputs.
-    3. Shows a live validation summary.
-    4. On button click, runs inference and displays:
-       - Predicted class (progression / stability).
-       - SHAP waterfall and decision plots for interpretability.
-    5. Populates the sidebar with model metadata, feature boundaries, and citation.
-    """
+    """Main Streamlit application entry point — dual-model version."""
 
     # Header
     st.markdown('''
     <div class="clinical-header">
-        <h1>👁️ Keratoconus 1-Year Progression Predictor</h1>
-        <p>Interactive Demonstration — Logistic Regression Model with 3 Baseline Pentacam Features</p>
+        <h1>👁️ Keratoconus Progression Predictor</h1>
+        <p>Interactive Demonstration — 1-Year and 2-Year Logistic Regression Models with Baseline Pentacam Features</p>
     </div>
     ''', unsafe_allow_html=True)
 
@@ -394,40 +397,39 @@ def main():
     </div>
     ''', unsafe_allow_html=True)
 
-    # Load model and data
-    model, scaler, boundaries = load_model_and_data()
-    feature_names = list(boundaries.keys())
+    # Load both models
+    model_1y, scaler_1y, bounds_1y = load_model_and_data("one_year")
+    model_2y, scaler_2y, bounds_2y = load_model_and_data("two_year")
+    all_boundaries = [bounds_1y, bounds_2y]
 
-    # --- Input Section ---
+    # --- Input Section: 5 features ---
     st.markdown('<p class="section-label">Baseline Pentacam Measurements</p>', unsafe_allow_html=True)
 
-    input_cols = st.columns(len(feature_names))
+    input_cols = st.columns(len(ALL_FEATURES))
     inputs = {}
-    validation_errors = []
 
-    for i, feature in enumerate(feature_names):
-        bounds = boundaries[feature]
+    for i, feature in enumerate(ALL_FEATURES):
+        merged = _merge_bounds_for_feature(feature, all_boundaries)
         label = FEATURE_LABELS.get(feature, feature)
+        used_by = FEATURE_MODELS[feature]
 
         with input_cols[i]:
             st.markdown(f'<div class="input-card"><h3>{label}</h3></div>', unsafe_allow_html=True)
-            # Allow input within ±1 SD beyond training min/max, clamped to 0
-            margin = bounds['std']
+            margin = merged['std']
             value = st.number_input(
                 f"{feature}",
-                min_value=float(max(0, bounds['min'] - margin)),
-                max_value=float(bounds['max'] + margin),
-                value=float(bounds['mean']),
-                step=float(bounds['std'] / 10),
+                min_value=float(max(0, merged['min'] - margin)),
+                max_value=float(merged['max'] + margin),
+                value=float(merged['mean']),
+                step=float(merged['std'] / 10),
                 key=feature,
                 label_visibility="collapsed",
-                help=f"Training range: [{bounds['min']:.3f} — {bounds['max']:.3f}] | Mean: {bounds['mean']:.3f} | SD: {bounds['std']:.3f}"
+                help=f"Used by: {used_by} | Range: [{merged['min']:.3f} — {merged['max']:.3f}] | Mean: {merged['mean']:.3f} | SD: {merged['std']:.3f}"
             )
             inputs[feature] = value
 
-            is_valid, error_msg = validate_input(value, feature, boundaries)
+            is_valid, _ = validate_input(value, feature, {"_": merged, feature: merged})
             if not is_valid:
-                validation_errors.append(error_msg)
                 st.markdown('<span class="validation-warn">Outside training range</span>', unsafe_allow_html=True)
             else:
                 st.markdown('<span class="validation-ok">Within range</span>', unsafe_allow_html=True)
@@ -436,44 +438,67 @@ def main():
     st.markdown("")
     predict_col1, predict_col2, predict_col3 = st.columns([1, 2, 1])
     with predict_col2:
-        predict_clicked = st.button("Estimate 1-Year Progression Risk", type="primary", use_container_width=True)
+        predict_clicked = st.button("Estimate Progression Risk", type="primary", use_container_width=True)
 
     if predict_clicked:
+        # Validate per-model
+        validation_errors = []
+        for model_key, config in MODEL_CONFIGS.items():
+            _, _, bounds = load_model_and_data(model_key)
+            for feat in config["feature_names"]:
+                is_valid, msg = validate_input(inputs[feat], feat, bounds)
+                if not is_valid:
+                    validation_errors.append(f"[{config['label']}] {msg}")
+
         if validation_errors:
             st.error("**Input Validation Errors**")
             for error in validation_errors:
                 st.warning(error)
         else:
-            input_raw = np.array([[inputs[f] for f in feature_names]])
-            input_array = scaler.transform(input_raw)
-
             try:
-                prediction = model.predict(input_array)[0]
-
-                # --- Result Display ---
-                st.markdown("")
-                res_col1, res_col2, res_col3 = st.columns([1, 3, 1])
-
-                with res_col2:
-                    if prediction == 1:
-                        st.markdown('''
-                        <div class="result-card result-progression">
-                            <h2>PROGRESSION RISK DETECTED</h2>
-                            <div class="label">The model predicts keratoconus progression within 1 year</div>
-                        </div>
-                        ''', unsafe_allow_html=True)
-                    else:
-                        st.markdown('''
-                        <div class="result-card result-stable">
-                            <h2>LOW PROGRESSION RISK</h2>
-                            <div class="label">The model predicts stability within 1 year</div>
-                        </div>
-                        ''', unsafe_allow_html=True)
-
-                # --- SHAP Explainability ---
+                # SHAP guide (once, before both models)
                 st.markdown("")
                 st.markdown('<p class="section-label">Model Explainability (SHAP Analysis)</p>', unsafe_allow_html=True)
-                display_shap_plots(model, scaler, input_array, feature_names)
+                display_shap_guide()
+
+                # Run both models
+                models_data = [
+                    ("one_year", model_1y, scaler_1y, bounds_1y),
+                    ("two_year", model_2y, scaler_2y, bounds_2y),
+                ]
+
+                for model_key, model, scaler, bounds in models_data:
+                    config = MODEL_CONFIGS[model_key]
+                    feature_names = config["feature_names"]
+                    window = config["window"]
+
+                    input_raw = np.array([[inputs[f] for f in feature_names]])
+                    input_scaled = scaler.transform(input_raw)
+                    prediction = model.predict(input_scaled)[0]
+
+                    # Section header
+                    st.markdown(f'<p class="section-label">{config["label"]} Model</p>', unsafe_allow_html=True)
+
+                    # Result card
+                    res_col1, res_col2, res_col3 = st.columns([1, 3, 1])
+                    with res_col2:
+                        if prediction == 1:
+                            st.markdown(f'''
+                            <div class="result-card result-progression">
+                                <h2>PROGRESSION RISK DETECTED</h2>
+                                <div class="label">The model predicts keratoconus progression within {window}</div>
+                            </div>
+                            ''', unsafe_allow_html=True)
+                        else:
+                            st.markdown(f'''
+                            <div class="result-card result-stable">
+                                <h2>LOW PROGRESSION RISK</h2>
+                                <div class="label">The model predicts stability within {window}</div>
+                            </div>
+                            ''', unsafe_allow_html=True)
+
+                    # SHAP plots
+                    display_shap_plots(model, scaler, input_scaled, feature_names)
 
             except Exception as e:
                 st.error(f"Prediction error: {str(e)}")
@@ -481,31 +506,35 @@ def main():
 
     # --- Sidebar ---
     with st.sidebar:
-        st.markdown("### Model Details")
-        st.markdown("""
-        | Property | Value |
-        |----------|-------|
-        | Algorithm | Logistic Regression |
-        | Features | 3 |
-        | Training set | 412 patients |
-        | Balancing | SMOTE (k=5) |
-        | Preprocessing | StandardScaler |
-        | Prediction window | 1 year |
-        """)
+        for model_key, config in MODEL_CONFIGS.items():
+            _, _, bounds = load_model_and_data(model_key)
 
-        st.markdown("### Feature Reference Ranges")
-        table_rows = ""
-        for feature, bounds in boundaries.items():
-            table_rows += f"<tr><td><b>{feature}</b></td><td>{bounds['min']:.3f}</td><td>{bounds['max']:.3f}</td><td>{bounds['mean']:.3f}</td><td>{bounds['std']:.3f}</td></tr>"
+            st.markdown(f"### {config['label']} Model")
+            st.markdown(f"""
+            | Property | Value |
+            |----------|-------|
+            | Algorithm | Logistic Regression |
+            | Features | {len(config['feature_names'])} ({', '.join(config['feature_names'])}) |
+            | Training set | {config['patients']} patients |
+            | Balancing | SMOTE (k=5) |
+            | Preprocessing | StandardScaler |
+            | Prediction window | {config['window']} |
+            """)
 
-        st.markdown(f'''
-        <table class="ref-table">
-            <thead><tr><th>Feature</th><th>Min</th><th>Max</th><th>Mean</th><th>SD</th></tr></thead>
-            <tbody>{table_rows}</tbody>
-        </table>
-        ''', unsafe_allow_html=True)
+            st.markdown(f"**Feature Reference Ranges**")
+            table_rows = ""
+            for feature in config["feature_names"]:
+                b = bounds[feature]
+                table_rows += f"<tr><td><b>{feature}</b></td><td>{b['min']:.3f}</td><td>{b['max']:.3f}</td><td>{b['mean']:.3f}</td><td>{b['std']:.3f}</td></tr>"
 
-        st.markdown("---")
+            st.markdown(f'''
+            <table class="ref-table">
+                <thead><tr><th>Feature</th><th>Min</th><th>Max</th><th>Mean</th><th>SD</th></tr></thead>
+                <tbody>{table_rows}</tbody>
+            </table>
+            ''', unsafe_allow_html=True)
+
+            st.markdown("---")
 
         st.markdown("""
         <div class="citation-box">
