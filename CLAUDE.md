@@ -47,12 +47,18 @@ streamlit run app.py
 ## Model Evaluation (local only)
 
 - **`keratoconus-model-evaluation/`** — Self-contained folder for evaluating both the one-year (BAD-D, Age, ARC 3mm) and two-year (Kmax, Age, Pachy Min) logistic regression models against three datasets (one-year, two-year, all follow-up). Contains patient data CSVs, pre-trained model/scaler `.pkl` files, and an `evaluate_models.py` script that writes markdown reports to `results/`. **Git-ignored — must never be committed.**
-- **`test_cases_oneYear.md`** / **`test_cases_twoYear.md`** — Manual test cases (5 each: 3 progressors + 2 stable) extracted from the training data CSVs with all 5 features. Located inside `keratoconus-model-evaluation/`. Git-ignored.
+- **`test_cases_oneYear.md`** / **`test_cases_twoYear.md`** — Manual test cases (5 each: 3 progressors + 2 stable) extracted from the training data CSVs with all 5 features, plus actual model predictions for both models. Located inside `keratoconus-model-evaluation/`. Git-ignored.
+- **`predict_test_cases.py`** — Script that loads both models and runs predictions on the test cases. Reproduces the model output columns in the test case markdown files. Located inside `keratoconus-model-evaluation/`. Git-ignored.
 - **`training_metrics.md`** (project root) — Generated sanity-check report. Git-ignored.
 
 Run the evaluation:
 ```bash
 python keratoconus-model-evaluation/evaluate_models.py
+```
+
+Run test case predictions:
+```bash
+python keratoconus-model-evaluation/predict_test_cases.py
 ```
 
 ## Privacy
