@@ -28,6 +28,10 @@ import shap
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+# High DPI for crisp rendering on retina/HiDPI displays
+plt.rcParams['figure.dpi'] = 200
+plt.rcParams['savefig.dpi'] = 200
+
 # Resolve paths relative to this file
 APP_DIR = Path(__file__).parent
 
@@ -327,7 +331,11 @@ def display_shap_guide():
         <b>Decision plot:</b> Traces the cumulative path from the base value (vertical grey line)
         to the final model output. Each line segment shows the shift caused by one feature,
         applied sequentially from bottom to top. A final value to the right of the base value
-        indicates a prediction toward progression; to the left, toward stability.
+        indicates a prediction toward progression; to the left, toward stability.<br>
+        <b>Note:</b> All values in these plots are expressed in <b>log-odds</b> (the model's
+        internal scoring scale), not probabilities. Positive log-odds favour progression;
+        negative log-odds favour stability. The magnitude indicates how strongly each feature
+        influences the prediction.
     </div>
     ''', unsafe_allow_html=True)
 
@@ -336,11 +344,6 @@ def display_shap_plots(model, scaler, input_data, input_raw, feature_names):
     """Render SHAP waterfall plot and decision plot for a prediction."""
     explainer = get_shap_explainer(model, scaler)
     shap_values = explainer.shap_values(input_data)
-
-    # High DPI for crisp rendering on retina/HiDPI displays
-    plot_dpi = 200
-    plt.rcParams['figure.dpi'] = plot_dpi
-    plt.rcParams['savefig.dpi'] = plot_dpi
 
     col_waterfall, col_decision = st.columns(2)
 
@@ -352,21 +355,21 @@ def display_shap_plots(model, scaler, input_data, input_raw, feature_names):
             data=input_raw[0],
             feature_names=feature_names
         )
-        fig_wf, ax_wf = plt.subplots(figsize=(10, 4), dpi=plot_dpi)
+        fig_wf, ax_wf = plt.subplots(figsize=(10, 4), dpi=200)
         shap.plots.waterfall(explanation, show=False)
-        st.pyplot(fig_wf, bbox_inches='tight', dpi=plot_dpi)
+        st.pyplot(fig_wf, bbox_inches='tight', dpi=200)
         plt.close(fig_wf)
 
     with col_decision:
         st.markdown('<p class="section-label">Decision Plot</p>', unsafe_allow_html=True)
-        fig_dp, ax_dp = plt.subplots(figsize=(10, 4), dpi=plot_dpi)
+        fig_dp, ax_dp = plt.subplots(figsize=(10, 4), dpi=200)
         shap.decision_plot(
             explainer.expected_value,
             shap_values,
             feature_names=feature_names,
             show=False
         )
-        st.pyplot(fig_dp, bbox_inches='tight', dpi=plot_dpi)
+        st.pyplot(fig_dp, bbox_inches='tight', dpi=200)
         plt.close(fig_dp)
 
 
@@ -482,6 +485,13 @@ def main():
         predict_clicked = st.button("Estimate Progression Risk", type="primary", use_container_width=True)
 
     if predict_clicked:
+        # Guard against missing or NaN inputs
+        invalid_inputs = [f for f in ALL_FEATURES
+                          if inputs[f] is None or np.isnan(float(inputs[f]))]
+        if invalid_inputs:
+            st.error(f"**Missing or invalid values for: {', '.join(invalid_inputs)}**")
+            st.stop()
+
         # Validate per-model
         validation_errors = []
         for model_key, config in MODEL_CONFIGS.items():
@@ -501,6 +511,13 @@ def main():
                 st.markdown("")
                 st.markdown('<p class="section-label">Model Explainability (SHAP Analysis)</p>', unsafe_allow_html=True)
                 display_shap_guide()
+                st.caption(
+                    "The **decision score** shown in each result card is the model's "
+                    "raw log-odds output. It is not a probability. Higher absolute "
+                    "values indicate stronger model confidence; values near zero "
+                    "indicate borderline cases. Use it only as a relative indication "
+                    "of prediction certainty."
+                )
 
                 # Run both models
                 models_data = [
@@ -517,18 +534,23 @@ def main():
                     input_raw = np.array([[inputs[f] for f in feature_names]])
                     input_scaled = scaler.transform(input_raw)
                     prediction = model.predict(input_scaled)[0]
+                    score = model.decision_function(input_scaled)[0]
 
                     # Styled model section container
                     st.markdown(f'<div class="model-section {css}"><p class="model-section-header">{config["label"]} Model &mdash; Features: {", ".join(feature_names)}</p></div>', unsafe_allow_html=True)
 
-                    # Result card
+                    # Result card with decision score
                     res_col1, res_col2, res_col3 = st.columns([1, 3, 1])
                     with res_col2:
+                        score_text = (f'<div style="font-size:0.82rem; margin-top:0.4rem; '
+                                      f'opacity:0.85;">Decision score: {score:+.2f} '
+                                      f'(log-odds)</div>')
                         if prediction == 1:
                             st.markdown(f'''
                             <div class="result-card result-progression">
                                 <h2>PROGRESSION RISK DETECTED</h2>
                                 <div class="label">The model predicts keratoconus progression within {window}</div>
+                                {score_text}
                             </div>
                             ''', unsafe_allow_html=True)
                         else:
@@ -536,6 +558,7 @@ def main():
                             <div class="result-card result-stable">
                                 <h2>LOW PROGRESSION RISK</h2>
                                 <div class="label">The model predicts stability within {window}</div>
+                                {score_text}
                             </div>
                             ''', unsafe_allow_html=True)
 
@@ -544,7 +567,6 @@ def main():
 
             except Exception as e:
                 st.error(f"Prediction error: {str(e)}")
-                st.exception(e)
 
     # --- Sidebar ---
     with st.sidebar:
