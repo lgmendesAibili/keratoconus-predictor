@@ -73,3 +73,20 @@ The `app.py` version is specifically designed to run without any patient data.
 ## Deployment
 
 Deployed on Streamlit Community Cloud. Pushing to `main` triggers automatic redeployment.
+
+### Streamlit Cloud Requirements
+
+The `requirements.txt` must include **all** transitive dependencies that the app uses, even indirectly (e.g., `pandas`, `sparklines`, `ipython`). Streamlit Cloud installs only what is listed — missing packages cause the deployment to hang silently during preparation without showing an error.
+
+If the app gets stuck in "preparing" after a reboot:
+1. Compare `requirements.txt` against a known working version (e.g., commit `1a1c8f9`)
+2. Check the Streamlit Cloud logs (Manage app → Logs)
+3. Try deleting and redeploying the app from the dashboard
+
+### Git Authentication (GitHub)
+
+The remote uses HTTPS (`lgmendesAibili` account). To authenticate:
+```bash
+gh auth login  # interactive browser-based login with one-time code
+```
+After authenticating, `git push origin main` works normally.
